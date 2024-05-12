@@ -32,20 +32,33 @@
 #define NONCE 16
 #define KEY_SIZE 32
 #define SALT_SIZE 64
+#define HEADER_SIZE 105
 
-enum Flags {
+// Kdf derive flags
+enum FlagsEncrypt {
 	ENCRYPT = 0,
 	DECRYPT = 1,
-	KEYFILE = 2
+	KEYFILE = 2,
+	HEADER1 = 3
+
+};
+
+// crypto file flags
+enum FlagsSettings {
+	DENIABILITY = 0,
+	COMPRESS = 1,
+	HEADER = 2
 };
 
 struct KdfParameters {
-	uint32_t kdf_strenth;
+	uint32_t kdf_strength;
 
-	uint32_t memory;
-	uint32_t time;
+	// Argon1id Scrypt parameters
+	uint32_t memory;		// M // N (CPU/Memory cost parameter)
+	uint32_t time;			// t // // r (Block size parameter)
 
-	uint32_t parallelism;
+	// universal param
+	uint32_t parallelism;	// p
 };
 
 struct KeyParameters {
@@ -56,15 +69,66 @@ struct KeyParameters {
 	Botan::secure_vector<uint8_t> iv;
 };
 
+struct EncryptFileHeader {
+	uint8_t version;
+	uint8_t encryptionAlgorithmID;
+	uint8_t kdfAlgorithmID;
+	uint8_t kdfStrength;
+	uint8_t compressFlag;
+	uint8_t keyfileFlag;
+
+	uint8_t reserved[99];
+};
+
 const std::string algorithms[] = {"AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)"};
 
 const std::string kdf[] = { "Argon2id", "Scrypt" };
 
-Botan::secure_vector<uint8_t> getHashFile(std::string file, std::string algo);
-void derive_key_from_password(const std::string& password, KdfParameters& param, KeyParameters& keydata, std::bitset<3> &flag, const std::string& kdf, const std::string& keyfile);
-void encryptFile(const std::string& inputFilename, const std::string& outputFilename, const KeyParameters& keyparams, wxGauge* gauge, const std::string& selectedCipher);
-void decryptFile(const std::string& inputFilename, const std::string& outputFilename, const KeyParameters& keyparams, wxGauge* gauge, const std::string& selectedCipher, bool deniabilityFlag, bool& stop);
-void getKeyParameters(const std::string& inputFilename, KeyParameters& keyparams);
+Botan::secure_vector<uint8_t> getHashFile(
+	_In_	std::string file,
+	_In_	std::string algo
+);
+
+void derive_key_from_password(
+	_In_	const std::string& password,
+	_Out_	KdfParameters& param,
+	_Out_	KeyParameters& keydata,
+	_In_	std::bitset<4> &flag,
+	_In_	const std::string& kdf,
+	_In_	const std::string& keyfile
+);
+
+
+void encryptFile(
+	_In_	const std::string& inputFilename,
+	_In_	const std::string& outputFilename,
+	_In_	const KeyParameters& keyparams,
+	_Out_	wxGauge* gauge,
+	_In_	const std::string& selectedCipher,
+	_In_	std::bitset<3>& flag,
+	_In_	EncryptFileHeader* header = nullptr  // const
+);
+
+void decryptFile(
+	_In_	const std::string& inputFilename,
+	_In_	const std::string& outputFilename,
+	_In_	const KeyParameters& keyparams,
+	_Out_	wxGauge* gauge,
+	_In_	const std::string& selectedCipher,
+	_In_	std::bitset<3>& flag,
+	_In_	bool& stop,
+	_In_	EncryptFileHeader* header = nullptr
+);
+
+void getKeyParameters(
+	_In_	const std::string& inputFilename,
+	_Out_	KeyParameters& keyparams,
+	_Out_	EncryptFileHeader* header = nullptr
+);
+
+void writeHeaderToFile(const EncryptFileHeader& header, const std::string& fileName);
+
+EncryptFileHeader createEncryptFileHeader(uint8_t version, uint8_t encrID, uint8_t kdfID, uint8_t kdfStrength, uint8_t compressFlag, uint8_t keyfileFlag);
 
 double calculateEntropy(const std::string& password);
 #endif

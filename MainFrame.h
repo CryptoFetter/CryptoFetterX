@@ -7,6 +7,7 @@ class MainFrame : public wxFrame
     wxCheckBox* compress_flag;
     wxCheckBox* delete_flag;
     wxCheckBox* keyfile_flag;
+    wxCheckBox* header_flag;
 
     wxButton* encryptButton;
     wxButton* decryptButton;
@@ -18,17 +19,15 @@ class MainFrame : public wxFrame
 
     wxString filePathCryptFile;
     wxString fullPathKeyFile;
+    wxString outputPathCryptFile;
 
-    wxTextCtrl* textCtrlPassword;
-    wxTextCtrl* textCtrlPlainText;
-    wxCheckBox* checkBox;
+    wxTextCtrl* textCtrlPassword;   // 
+    wxTextCtrl* textCtrlPlainText;  // 
 
     wxGauge* progress_crypt;
     wxGauge* progress_pass;
 
-    wxTextCtrl* keyfileTextCtrl;
-
-    wxStaticText* statusLine1;
+    wxStaticText* keyfileStaticText;    //
 
     HWND hWndPassword, hWndConfirmPassword;
     wxCheckBox* hidePassCheckBox;
@@ -42,19 +41,21 @@ class MainFrame : public wxFrame
     wxSlider* kdf_slider;
 
     bool deniabilityFlag;
+    bool compressFlag;
 
     wxChoice* cipher_choice;
     wxChoice* kdf_choice;
 
-    wxString textKdfAlgo, textCryptAlgo, textKdfStr;
+    wxStaticText* in_file;
 
-    wxTextCtrl* textKdf;
-    wxTextCtrl* textKdfStrenth;
-    wxTextCtrl* textCipher;
-    wxTextCtrl* textSalt;
-    wxTextCtrl* textKey;
+    wxStaticText* textKdf;
+    wxStaticText* textKdfStrenth;
+    wxStaticText* textCipher;
+    wxStaticText* textSalt;
+    wxStaticText* textKey;
 
     void OnEnterPass(wxCommandEvent& event);
+    void UpdateGaugeColor(int value);
 
     void OnKdfChoice(wxCommandEvent& event);
     void OnCipherChoice(wxCommandEvent& event);
@@ -81,5 +82,9 @@ public:
     void OnHidePassBox(wxCommandEvent& event);
 
     void OnKeyfileBoxChanged(wxCommandEvent& event);
+
+    void OnHeaderBoxChanged(wxCommandEvent& event);
+
+    void OnSaveCryptFile(wxCommandEvent& event);
 
 };
