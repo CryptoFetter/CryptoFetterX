@@ -7,7 +7,7 @@ wxIMPLEMENT_APP(Fetter);
 
 bool Fetter::OnInit()
 {
-	MainFrame* mainFrame = new MainFrame("CryptoFetter v. 0.7.2");
+	MainFrame* mainFrame = new MainFrame("CryptoFetter v. 0.8");
 
 	mainFrame->SetClientSize(815, 530);
 	mainFrame->SetSizeHints(815, 530, 815, 530);

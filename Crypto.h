@@ -13,11 +13,9 @@
 
 #include "botan/bzip2.h"
 
-#include <iostream>
 #include <fstream>
 #include <vector>
 #include <cmath>
-#include <set>
 #include <bitset>
 
 enum FlagsEncrypt {
@@ -59,7 +57,7 @@ public:
     std::string cipherAlgo;
     bool compressFlag;
 
-    std::bitset<4> derive_flag;
+    std::bitset<3> derive_flag;
 
     std::bitset<3> encrypt_flag;
     std::bitset<3> decrypt_flag;
@@ -97,7 +95,7 @@ public:
         const std::string& password,
         KdfParameters& param,
         KeyParameters& keydata,
-        std::bitset<4>& flag,
+        const std::bitset<3>& flag,
         const std::string& kdf,
         const std::string& keyfile
     );
@@ -107,7 +105,7 @@ public:
         const std::string& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
-        std::bitset<3>& flag,
+        const std::bitset<3>& flag,
         const OptionalFetterHeader* header = nullptr
     );
 
@@ -116,9 +114,9 @@ public:
         const std::string& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
-        std::bitset<3>& flag,
+        const std::bitset<3>& flag,
         bool& stop,
-        OptionalFetterHeader* header = nullptr
+        const OptionalFetterHeader* header = nullptr
     );
 
     bool getKeyParameters(

@@ -1,11 +1,6 @@
 ﻿#include "MainFrame.h"
 #include "Crypto.h"
 
-#include <wx/wx.h>
-#include <wx/filename.h>
-
-#include <filesystem>
-
 namespace fs = std::filesystem;
 
 MainFrame::MainFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
@@ -15,7 +10,7 @@ MainFrame::MainFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
 	// StaticBox "Enter password"
 	wxStaticBox* password_box = new wxStaticBox(panel, wxID_ANY, "Enter password", wxPoint(520, 10), wxSize(270, 240));
 
-	wxStaticText* confim_text = new wxStaticText(panel, wxID_ANY, "Confim password:", wxPoint(530, 95), wxSize(250, 25));
+	wxStaticText* confirm_text = new wxStaticText(panel, wxID_ANY, "Confirm password:", wxPoint(530, 95), wxSize(250, 25));
 	wxStaticText* quality_text = new wxStaticText(panel, wxID_ANY, "Password quality:", wxPoint(530, 200), wxSize(250, 25));
 
 	passText = new wxTextCtrl(panel, wxID_ANY, "", wxPoint(530, 60), wxSize(250, 25), wxTE_PASSWORD);
@@ -60,8 +55,6 @@ MainFrame::MainFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
 
 	progress_pass = new wxGauge(panel, wxID_ANY, 100, wxPoint(530, 225), wxSize(250, 15));
 
-	deniabilityFlag = true;
-
 	compress_flag->SetValue(true);
 
 	compress_flag->Bind(wxEVT_CHECKBOX, &MainFrame::OnCompressCheckBoxChanged, this);
@@ -74,7 +67,7 @@ MainFrame::MainFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
 
 	textCipher = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 215), wxSize(390, 20), wxST_NO_AUTORESIZE);
 	textKdf = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 235), wxSize(390, 20), wxST_NO_AUTORESIZE);
-	textKdfStrenth = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 255), wxSize(390, 20), wxST_NO_AUTORESIZE);
+	textKdfStrength = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 255), wxSize(390, 20), wxST_NO_AUTORESIZE);
 	textHeader = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 275), wxSize(390, 20), wxST_NO_AUTORESIZE);
 	textCompress = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 295), wxSize(390, 20), wxST_NO_AUTORESIZE);
 	textKeyfile = new wxStaticText(panel, wxID_ANY, wxEmptyString, wxPoint(15, 315), wxSize(390, 20), wxST_NO_AUTORESIZE);
@@ -109,7 +102,6 @@ MainFrame::MainFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
 	kdf_slider->Bind(wxEVT_SLIDER, &MainFrame::OnKdfSlider, this);
 
 	// Other
-
 	encryptButton = new wxButton(panel, wxID_ANY, "Encrypt", wxPoint(10, 405), wxSize(170, 45));
 	encryptButton->Bind(wxEVT_BUTTON, &MainFrame::OnEncryptFile, this);
 
@@ -130,11 +122,6 @@ MainFrame::MainFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
 	fileListToCrypt->InsertColumn(0, "Name", wxLIST_FORMAT_LEFT, 382);
 
 	outputFolderStaticText = new wxStaticText(panel, wxID_ANY, "", wxPoint(260, 170), wxSize(150, 20), wxST_NO_AUTORESIZE);
-}
-
-void MainFrame::OnItemSelected(wxListEvent& event)
-{
-	event.Veto();
 }
 
 void MainFrame::OnKdfSlider(wxCommandEvent& event)
@@ -179,18 +166,14 @@ void MainFrame::OnCipherChoice(wxCommandEvent& event)
 			selectedCipher = "Auto";
 			break;
 		}
-
 	}
-
 }
 
 void MainFrame::OnKdfChoice(wxCommandEvent& event)
 {
-
 	wxChoice* choice = dynamic_cast<wxChoice*>(event.GetEventObject());
 	if (choice)
 	{
-
 		int selectedKdfNum = choice->GetSelection();
 
 		switch (selectedKdfNum)
@@ -209,8 +192,6 @@ void MainFrame::OnKdfChoice(wxCommandEvent& event)
 			break;
 		}
 	}
-
-
 }
 
 void MainFrame::OnHidePassBox(wxCommandEvent& event)
@@ -351,11 +332,6 @@ void MainFrame::OnOpenKeyFile(wxCommandEvent& event)
 
 }
 
-void MainFrame::OnDeniabilityCheckBoxChanged(wxCommandEvent& event)
-{
-
-}
-
 void MainFrame::OnKeyfileBoxChanged(wxCommandEvent& event)
 {
 	if (keyfile_flag->GetValue())
@@ -376,8 +352,6 @@ void MainFrame::OnHeaderBoxChanged(wxCommandEvent& event)
 
 	if (header_flag->GetValue())
 	{
-		deniabilityFlag = false;
-
 		cipher_choice->Enable(true);
 		kdf_choice->Enable(true);
 
@@ -394,8 +368,6 @@ void MainFrame::OnHeaderBoxChanged(wxCommandEvent& event)
 	}
 	else
 	{
-		deniabilityFlag = true;
-
 		cipher_choice->Insert(removedStringCipher, 0);
 		kdf_choice->Insert(removedStringKdf, 0);
 
@@ -406,15 +378,10 @@ void MainFrame::OnHeaderBoxChanged(wxCommandEvent& event)
 
 void MainFrame::OnCompressCheckBoxChanged(wxCommandEvent& event)
 {
-	if (compress_flag->GetValue())
+	if (!compress_flag->GetValue())
 	{
-		compressFlag = true;
+		wxMessageBox("The lack of data compression weakens the encryption somewhat!");
 	}
-	else
-	{
-
-	}
-
 }
 
 void MainFrame::OnDeleteCheckBoxChanged(wxCommandEvent& event)
@@ -437,30 +404,14 @@ void MainFrame::UpdateStatus(
 	Botan::secure_vector<uint8_t>& key
 )
 {
-	std::string kdf_string;
-
-	switch (kdf_strength)
-	{
-	case 0:
-
-		kdf_string = "Low";
-		break;
-	case 1:
-
-		kdf_string = "Medium";
-		break;
-	case 2:
-
-		kdf_string = "High";
-		break;
-	}
+	std::string kdf_string = (kdf_strength == 0) ? "Low" : (kdf_strength == 1 ? "Medium" : "High");
 
 	textKdf->SetLabelText(wxEmptyString);
 	textKdfStrenth->SetLabelText(wxEmptyString);
 	textCipher->SetLabelText(wxEmptyString);
 
 	textKdf->SetLabelText("KDF algo: " + selectedKdf);
-	textKdfStrenth->SetLabelText("KDF strenth: " + kdf_string);
+	textKdfStrenth->SetLabelText("KDF strength: " + kdf_string);
 	textCipher->SetLabelText("Cipher: " + selectedCipher);
 
 	wxString comp = compress ? "Yes" : "No";
@@ -537,20 +488,8 @@ void MainFrame::OnEncryptFile(wxCommandEvent& event)
 
 	encrypt.kdf_params.kdf_strength = kdf_slider->GetValue();
 
-	if (keyfile_flag->GetValue())
-	{
-		encrypt.derive_flag.set(KEYFILE);
-		encrypt.derive_flag.set(ENCRYPT);
-	}
-	else
-	{
-		encrypt.derive_flag.set(ENCRYPT);
-	}
-
-	if (compress_flag->GetValue())
-	{
-		encrypt.encrypt_flag.set(COMPRESS);
-	}
+	encrypt.derive_flag.set(keyfile_flag->GetValue() ? (KEYFILE | ENCRYPT) : ENCRYPT);
+	encrypt.encrypt_flag.set(compress_flag->GetValue() ? COMPRESS : 0);
 
 	if (keyfile_flag->GetValue() &&
 		encrypt.derive_flag.test(KEYFILE) &&
@@ -615,7 +554,7 @@ void MainFrame::OnEncryptFile(wxCommandEvent& event)
 
 		UpdateStatus(
 			textKdf,
-			textKdfStrenth,
+			textKdfStrength,
 			textCipher,
 			selectedKdf,
 			encrypt.kdf_params.kdf_strength,
@@ -671,6 +610,8 @@ void MainFrame::OnDecryptFile(wxCommandEvent& event)
 
 			bool stop_flag = false;
 
+			decrypt.decrypt_flag.reset();
+
 			decrypt.decrypt_flag.set(HEADER);
 
 			decrypt.header.compressFlag ? decrypt.decrypt_flag.set(COMPRESS) : 0;
@@ -697,7 +638,7 @@ void MainFrame::OnDecryptFile(wxCommandEvent& event)
 
 			UpdateStatus(
 				textKdf,
-				textKdfStrenth,
+				textKdfStrength,
 				textCipher,
 				selectedKdf,
 				decrypt.kdf_params.kdf_strength,
@@ -717,6 +658,8 @@ void MainFrame::OnDecryptFile(wxCommandEvent& event)
 		else { // No header
 			bool stop_flag = false;
 
+			decrypt.decrypt_flag.reset();
+
 			decrypt.kdf_params.kdf_strength = kdf_slider->GetValue();
 
 			for (int x = 0; x < 2; x++)
@@ -725,13 +668,13 @@ void MainFrame::OnDecryptFile(wxCommandEvent& event)
 
 				decrypt.deriveKeyFromPassword(pass.ToStdString(), decrypt.kdf_params, decrypt.key_params, decrypt.derive_flag, selectedKdf, fullPathKeyFile.ToStdString());
 
-				output = generateNewFileName(files[i].ToStdString(), i);
+				output = generateNewFileName(files[i], i);
 
 				decrypt.decryptFile(files[i].ToStdString(), output.ToStdString(), decrypt.key_params, selectedCipher, decrypt.decrypt_flag, stop_flag);
 
 				UpdateStatus(
 					textKdf,
-					textKdfStrenth,
+					textKdfStrength,
 					textCipher,
 					selectedKdf,
 					decrypt.kdf_params.kdf_strength,

@@ -1,6 +1,9 @@
 ﻿#include <wx/wx.h>
 
 #include <wx/listctrl.h>
+#include <wx/filename.h>
+
+#include <filesystem>
 
 #include "botan/aead.h"
 #include "botan/auto_rng.h"
@@ -63,14 +66,11 @@ class MainFrame : public wxFrame
     wxSlider* slider;
     wxSlider* kdf_slider;
 
-    bool deniabilityFlag;
-    bool compressFlag;
-
     wxChoice* cipher_choice;
     wxChoice* kdf_choice;
 
     wxStaticText* textKdf;
-    wxStaticText* textKdfStrenth;
+    wxStaticText* textKdfStrength;
     wxStaticText* textCipher;
     wxStaticText* textHeader;
     wxStaticText* textCompress;
@@ -95,8 +95,6 @@ public:
 
     void OnOpenKeyFile(wxCommandEvent& event);
 
-    void OnDeniabilityCheckBoxChanged(wxCommandEvent& event);
-
     void OnCompressCheckBoxChanged(wxCommandEvent& event);
 
     void OnDeleteCheckBoxChanged(wxCommandEvent& event);
@@ -112,8 +110,6 @@ public:
     void OnHeaderBoxChanged(wxCommandEvent& event);
 
     void OnSaveOutputFolder(wxCommandEvent& event);
-
-    void OnItemSelected(wxListEvent& event);
 
     void UpdateStatus(
         wxStaticText* textKdf,
