@@ -43,7 +43,7 @@ unsigned int CryptoManager::deriveKeyFromPassword(
 	const std::string& password,
 	KdfParameters& param,
 	KeyParameters& keydata,
-	const std::bitset<3>& flag,
+	const std::bitset<6>& flag,
 	const std::string& kdf,
 	const std::string& keyfile
 )
@@ -94,7 +94,7 @@ void CryptoManager::encryptFile(
 	const std::string& outputFilename,
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
-	const std::bitset<3>& flag,
+	const std::bitset<6>& flag,
 	const OptionalFetterHeader* header
 )
 {
@@ -119,8 +119,19 @@ void CryptoManager::encryptFile(
 
 	}
 
-	out.write((const char*)iv_bits.data(), iv_bits.size());
-	out.write((const char*)keyparams.salt.data(), keyparams.salt.size());
+	if (flag.test(KEYFILE)) {
+
+		Botan::secure_vector<uint8_t> salt1 = Botan::secure_vector<uint8_t>(SALT_SIZE);
+		Botan::system_rng().randomize(salt1);
+
+		out.write((const char*)iv_bits.data(), iv_bits.size());
+		out.write((const char*)salt1.data(), salt1.size());
+
+	}
+	else {
+		out.write((const char*)iv_bits.data(), iv_bits.size());
+		out.write((const char*)keyparams.salt.data(), keyparams.salt.size());
+	}
 
 	std::vector<uint8_t> buffer(totalFileSize + (IV_SIZE + SALT_SIZE + NONCE));
 
@@ -152,7 +163,7 @@ void CryptoManager::encryptFile(
 	}
 	catch (const std::exception& e)
 	{
-
+		//MessageBoxA(nullptr, e.what(), "Encrypt", MB_OK | MB_ICONERROR);
 	}
 
 	in.close();
@@ -164,7 +175,7 @@ void CryptoManager::decryptFile(
 	const std::string& outputFilename,
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
-	const std::bitset<3>& flag,
+	const std::bitset<6>& flag,
 	bool& stop,
 	const OptionalFetterHeader* header
 ) {
@@ -349,7 +360,6 @@ bool CryptoManager::getKeyParameters(
 	keyparams.iv = iv;
 	keyparams.salt = salt;
 
-
 	in.close();
 
 	return result;
@@ -383,28 +393,38 @@ CryptoManager::OptionalFetterHeader CryptoManager::createEncryptFileHeader(
 	return header;
 }
 
-double CryptoManager::calculateEntropy(
-	const std::string& password
-) {
+double CryptoManager::calculateEntropy(const std::string& password) {
 	const int specialCharSize = 15;
 	int charsetSize = 0;
 	bool hasLowerCase = false, hasUpperCase = false, hasDigit = false, hasSpecialChar = false;
+	bool hasConsecutiveCharacters = false;
 
-	for (char ch : password) {
+	for (size_t i = 0; i < password.size(); ++i) {
+		char ch = password[i];
 		if (islower(ch)) hasLowerCase = true;
 		else if (isupper(ch)) hasUpperCase = true;
 		else if (isdigit(ch)) hasDigit = true;
 		else hasSpecialChar = true;
+
+		if (i > 0 && password[i] == password[i - 1]) {
+			hasConsecutiveCharacters = true;
+			break;
+		}
 	}
 
 	charsetSize = 0
-		+ (hasLowerCase ? 26 : 0)
-		+ (hasUpperCase ? 26 : 0)
+		+ (hasLowerCase ? 10 : 0)
+		+ (hasUpperCase ? 10 : 0)
 		+ (hasDigit ? 10 : 0)
 		+ (hasSpecialChar ? specialCharSize : 0);
 
-	int effectiveCharsetSize = charsetSize;
-	if (effectiveCharsetSize == 0) effectiveCharsetSize = 1;
+	int effectiveCharsetSize = (charsetSize == 0) ? 1 : charsetSize;
 
-	return password.length() * std::log2(effectiveCharsetSize);
+	double entropy = password.length() * std::log2(effectiveCharsetSize);
+
+	if (hasConsecutiveCharacters) {
+		entropy /= 2;
+	}
+
+	return entropy;
 }

@@ -1,34 +1,26 @@
-#include "botan/aead.h"
-#include "botan/auto_rng.h"
-#include "botan/block_cipher.h"
-#include "botan/cipher_mode.h"
+#include <botan/secmem.h>
+#include <botan/auto_rng.h>
+#include <botan/cipher_mode.h>
 #include <botan/filters.h>
-#include "botan/hash.h"
-#include "botan/hex.h"
-#include "botan/rng.h"
-#include "botan/kdf.h"
-#include "botan/pwdhash.h"
-#include "botan/secmem.h"
-#include "botan/system_rng.h"
+#include <botan/hex.h>
+#include <botan/kdf.h>
+#include <botan/pwdhash.h>
+#include <botan/system_rng.h>
+#include <botan/compression.h>
 
-#include "botan/bzip2.h"
+#include <include/bzlib.h>
 
+#include <bitset>
 #include <fstream>
 #include <vector>
-#include <cmath>
-#include <bitset>
 
-enum FlagsEncrypt {
-    ENCRYPT = 0,
-    DECRYPT = 1,
-    KEYFILE = 2
-
-};
-
-enum FlagsSettings {
+enum FlagsCrypto {
     DENIABILITY = 0,
     COMPRESS = 1,
-    HEADER = 2
+    HEADER = 2,
+    ENCRYPT = 3,
+    DECRYPT = 4,
+    KEYFILE = 5
 };
 
 class CryptoManager {
@@ -57,10 +49,7 @@ public:
     std::string cipherAlgo;
     bool compressFlag;
 
-    std::bitset<3> derive_flag;
-
-    std::bitset<3> encrypt_flag;
-    std::bitset<3> decrypt_flag;
+    std::bitset<6> crypto_flags;
 
     std::vector<std::string> kdf;
     std::vector<std::string> algorithms;
@@ -95,7 +84,7 @@ public:
         const std::string& password,
         KdfParameters& param,
         KeyParameters& keydata,
-        const std::bitset<3>& flag,
+        const std::bitset<6>& flag,
         const std::string& kdf,
         const std::string& keyfile
     );
@@ -105,7 +94,7 @@ public:
         const std::string& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
-        const std::bitset<3>& flag,
+        const std::bitset<6>& flag,
         const OptionalFetterHeader* header = nullptr
     );
 
@@ -114,7 +103,7 @@ public:
         const std::string& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
-        const std::bitset<3>& flag,
+        const std::bitset<6>& flag,
         bool& stop,
         const OptionalFetterHeader* header = nullptr
     );
@@ -139,4 +128,6 @@ public:
     CryptoManager(const std::vector<std::string>& kdfInit, const std::vector<std::string>& algorithmsInit)
         : kdf(kdfInit), algorithms(algorithmsInit) {
     }
+
+    CryptoManager(){}
 };
