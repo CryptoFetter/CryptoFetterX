@@ -5,7 +5,7 @@ wxIMPLEMENT_APP(Fetter);
 
 bool Fetter::OnInit()
 {
-	EncryptFrame* mainFrame = new EncryptFrame("CryptoFetter v. 0.8.5");
+	EncryptFrame* mainFrame = new EncryptFrame("CryptoFetter v. 0.9");
 
 	mainFrame->SetClientSize(815, 550);
 	mainFrame->SetSizeHints(815, 550, 815, 550);

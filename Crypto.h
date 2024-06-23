@@ -14,6 +14,10 @@
 #include <fstream>
 #include <vector>
 
+constexpr int ERROR_KDF_STRENGTH = 0x00000071;
+constexpr int ERROR_KEYFILE_MISSING = 0x00000072;
+constexpr int ERROR_DERIVE_KEY = 0x00000073;
+
 enum FlagsCrypto {
     DENIABILITY = 0,
     COMPRESS = 1,
@@ -30,9 +34,6 @@ class CryptoManager {
     static const int KEY_SIZE = 32;
     static const int SALT_SIZE = 64;
     static const int HEADER_SIZE = 105;
-
-    static const int ERROR_KDF_STRENGTH = 0x00000071;
-    static const int ERROR_KEYFILE_MISSING = 0x00000072;
 
     struct EncryptFetterHeader {
         Botan::secure_vector<uint8_t> salt;

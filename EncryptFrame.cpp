@@ -411,6 +411,8 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 {
 	Botan::AutoSeeded_RNG rng;
 
+	unsigned int status = 0;
+
 	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
 	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
 
@@ -486,7 +488,21 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 		kdfID = rng.next_byte() / 128;
 
 		selectedKdf = encrypt.kdf[kdfID];
-		encrypt.deriveKeyFromPassword(pass.ToStdString(), encrypt.kdf_params, encrypt.key_params, encrypt.crypto_flags, selectedKdf, fullPathKeyFile.ToStdString());
+
+		status = encrypt.deriveKeyFromPassword(
+			pass.ToStdString(), 
+			encrypt.kdf_params, 
+			encrypt.key_params, 
+			encrypt.crypto_flags, 
+			selectedKdf, 
+			fullPathKeyFile.ToStdString()
+		);
+
+		if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+			
+			wxMessageBox(_("Encryption error"), _("Encrypt"), wxOK | wxICON_ERROR, this);
+			return; 
+		}
 	}
 	else
 	{
@@ -495,7 +511,20 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 		encrypt.crypto_flags.test(HEADER) ?
 			selectedKdf = encrypt.kdf[kdfID] : selectedKdf = encrypt.kdf[--kdfID];
 
-		encrypt.deriveKeyFromPassword(pass.ToStdString(), encrypt.kdf_params, encrypt.key_params, encrypt.crypto_flags, selectedKdf, fullPathKeyFile.ToStdString());
+		status = encrypt.deriveKeyFromPassword(
+			pass.ToStdString(), 
+			encrypt.kdf_params, 
+			encrypt.key_params, 
+			encrypt.crypto_flags, 
+			selectedKdf, 
+			fullPathKeyFile.ToStdString()
+		);
+
+		if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+			
+			wxMessageBox(_("Encryption error"), _("Encrypt"), wxOK | wxICON_ERROR, this);
+			return; 
+		}
 	}
 
 	if (cipher_choice->GetStringSelection() == "Auto") {
@@ -544,7 +573,14 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 			encrypt.key_params.key
 		);
 
-		encrypt.encryptFile(files[i].ToStdString(), output.ToStdString(), encrypt.key_params, selectedCipher, encrypt.crypto_flags, &encrypt.header);
+		encrypt.encryptFile(
+			files[i].ToStdString(), 
+			output.ToStdString(), 
+			encrypt.key_params, 
+			selectedCipher, 
+			encrypt.crypto_flags, 
+			&encrypt.header
+		);
 
 		if (delete_flag->GetValue())
 		{
@@ -559,6 +595,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 {
 	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
 	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
+
+	unsigned int status = 0;
 
 	CryptoManager decrypt(kdf, algorithms);
 
@@ -619,7 +657,20 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 			progress_crypt->SetValue(static_cast<int>(progress));
 			wxYield();
 
-			decrypt.deriveKeyFromPassword(pass.ToStdString(), decrypt.kdf_params, decrypt.key_params, decrypt.crypto_flags, selectedKdf, fullPathKeyFile.ToStdString());
+			status = decrypt.deriveKeyFromPassword(
+				pass.ToStdString(), 
+				decrypt.kdf_params, 
+				decrypt.key_params, 
+				decrypt.crypto_flags, 
+				selectedKdf, 
+				fullPathKeyFile.ToStdString()
+			);
+
+			if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+
+				wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
+				return;
+			}
 
 			UpdateStatus(
 				textKdf,
@@ -638,7 +689,15 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 
 			output = generateNewFileName(files[i], i);
 
-			decrypt.decryptFile(files[i].ToStdString(), output.ToStdString(), decrypt.key_params, selectedCipher, decrypt.crypto_flags, stop_flag, &decrypt.header);
+			decrypt.decryptFile(
+				files[i].ToStdString(), 
+				output.ToStdString(), 
+				decrypt.key_params, 
+				selectedCipher, 
+				decrypt.crypto_flags, 
+				stop_flag, 
+				&decrypt.header
+			);
 		}
 		else { // No header
 			bool stop_flag = false;
@@ -655,32 +714,59 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 
 			decrypt.kdf_params.kdf_strength = kdf_slider->GetValue();
 
-			for (int x = 0; x < 2; x++)
-			{
-				selectedKdf = decrypt.kdf[x];
+			for (size_t x = 0; x < 2; ++x) {
 
-				decrypt.deriveKeyFromPassword(pass.ToStdString(), decrypt.kdf_params, decrypt.key_params, decrypt.crypto_flags, selectedKdf, fullPathKeyFile.ToStdString());
+				if (stop_flag) continue;
 
-				output = generateNewFileName(files[i], i);
+				decrypt.kdf_params.kdf_strength = x;
 
-				UpdateStatus(
-					textKdf,
-					textKdfStrength,
-					textCipher,
-					selectedKdf,
-					decrypt.kdf_params.kdf_strength,
-					decrypt.cipherAlgo,
-					0,
-					decrypt.compressFlag,
-					0,
-					decrypt.key_params.iv,
-					decrypt.key_params.salt,
-					decrypt.key_params.key
-				);
+				for (int x = 0; x < decrypt.kdf.size(); x++)
+				{
+					if (stop_flag) continue;
 
-				decrypt.decryptFile(files[i].ToStdString(), output.ToStdString(), decrypt.key_params, selectedCipher, decrypt.crypto_flags, stop_flag);
+					selectedKdf = decrypt.kdf[x];
 
-				if (stop_flag) break;
+					status = decrypt.deriveKeyFromPassword(
+						pass.ToStdString(),
+						decrypt.kdf_params,
+						decrypt.key_params,
+						decrypt.crypto_flags,
+						selectedKdf,
+						fullPathKeyFile.ToStdString()
+					);
+
+					if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+
+						wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
+						return;
+					}
+
+					output = generateNewFileName(files[i], i);
+
+					UpdateStatus(
+						textKdf,
+						textKdfStrength,
+						textCipher,
+						selectedKdf,
+						decrypt.kdf_params.kdf_strength,
+						decrypt.cipherAlgo,
+						0,
+						decrypt.compressFlag,
+						0,
+						decrypt.key_params.iv,
+						decrypt.key_params.salt,
+						decrypt.key_params.key
+					);
+
+					decrypt.decryptFile(
+						files[i].ToStdString(),
+						output.ToStdString(),
+						decrypt.key_params,
+						selectedCipher,
+						decrypt.crypto_flags,
+						stop_flag
+					);
+				}
 			}
 
 			progress = static_cast<float>((i + 1) * 100) / files.GetCount();
