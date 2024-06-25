@@ -1,5 +1,6 @@
 ﻿#include "EncryptFrame.h"
 #include "Crypto.h"
+#include "Errors.h"
 
 namespace fs = std::filesystem;
 
@@ -412,6 +413,9 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 	Botan::AutoSeeded_RNG rng;
 
 	unsigned int status = 0;
+	wxString output;
+	int kdfID, cipherID;
+	float progress;
 
 	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
 	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
@@ -419,12 +423,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 	CryptoManager encrypt(kdf, algorithms);
 
 	wxString pass = passText->GetValue();
-	wxString output;
-
 	wxFileName filePath1(output);
-
-	int kdfID, cipherID;
-	float progress;
 
 	if (passText->IsEmpty() || confPassText->IsEmpty())
 	{
@@ -498,7 +497,8 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 			fullPathKeyFile.ToStdString()
 		);
 
-		if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+		if (status == ERROR_DERIVE_KEY || 
+			status == ERROR_KEYFILE_MISSING) {
 			
 			wxMessageBox(_("Encryption error"), _("Encrypt"), wxOK | wxICON_ERROR, this);
 			return; 
@@ -520,7 +520,8 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 			fullPathKeyFile.ToStdString()
 		);
 
-		if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+		if (status == ERROR_DERIVE_KEY || 
+			status == ERROR_KEYFILE_MISSING) {
 			
 			wxMessageBox(_("Encryption error"), _("Encrypt"), wxOK | wxICON_ERROR, this);
 			return; 
@@ -596,7 +597,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
 	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
 
-	unsigned int status = 0;
+	size_t status = 0;
 
 	CryptoManager decrypt(kdf, algorithms);
 
@@ -666,7 +667,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				fullPathKeyFile.ToStdString()
 			);
 
-			if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+			if (status == ERROR_DERIVE_KEY || 
+				status == ERROR_KEYFILE_MISSING) {
 
 				wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
 				return;
@@ -712,9 +714,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				decrypt.crypto_flags.set(DECRYPT);
 			}
 
-			decrypt.kdf_params.kdf_strength = kdf_slider->GetValue();
-
-			for (size_t x = 0; x < 2; ++x) {
+			for (size_t x = 0; x < 3; x++) {
 
 				if (stop_flag) continue;
 
@@ -735,7 +735,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 						fullPathKeyFile.ToStdString()
 					);
 
-					if (status == ERROR_DERIVE_KEY || status == ERROR_KEYFILE_MISSING) {
+					if (status == ERROR_DERIVE_KEY || 
+						status == ERROR_KEYFILE_MISSING) {
 
 						wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
 						return;
@@ -758,7 +759,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 						decrypt.key_params.key
 					);
 
-					decrypt.decryptFile(
+					status = decrypt.decryptFile(
 						files[i].ToStdString(),
 						output.ToStdString(),
 						decrypt.key_params,
@@ -766,6 +767,12 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 						decrypt.crypto_flags,
 						stop_flag
 					);
+
+					if (status == ERROR_DECRYPT) {
+
+						wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
+
+					}
 				}
 			}
 

@@ -17,6 +17,11 @@
 constexpr int ERROR_KDF_STRENGTH = 0x00000071;
 constexpr int ERROR_KEYFILE_MISSING = 0x00000072;
 constexpr int ERROR_DERIVE_KEY = 0x00000073;
+constexpr int ERROR_DECRYPT = 0x00000074;
+constexpr int ERROR_ENCRYPT = 0x00000075;
+constexpr int ERROR_OPEN_FILE = 0x00000076;
+constexpr int ERROR_OK = 0x00000077;
+
 
 enum FlagsCrypto {
     DENIABILITY = 0,
@@ -90,7 +95,7 @@ public:
         const std::string& keyfile
     );
 
-    void encryptFile(
+    size_t encryptFile(
         const std::string& inputFilename,
         const std::string& outputFilename,
         const KeyParameters& keyparams,
@@ -99,7 +104,7 @@ public:
         const OptionalFetterHeader* header = nullptr
     );
 
-    void decryptFile(
+    size_t decryptFile(
         const std::string& inputFilename,
         const std::string& outputFilename,
         const KeyParameters& keyparams,
