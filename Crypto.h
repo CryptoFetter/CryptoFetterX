@@ -1,3 +1,6 @@
+#ifndef CRYPTO_H
+#define CRYPTO_H
+
 #include <botan/secmem.h>
 #include <botan/auto_rng.h>
 #include <botan/cipher_mode.h>
@@ -14,28 +17,31 @@
 #include <fstream>
 #include <vector>
 
-constexpr int ERROR_KDF_STRENGTH = 0x00000071;
-constexpr int ERROR_KEYFILE_MISSING = 0x00000072;
-constexpr int ERROR_DERIVE_KEY = 0x00000073;
-constexpr int ERROR_DECRYPT = 0x00000074;
-constexpr int ERROR_ENCRYPT = 0x00000075;
-constexpr int ERROR_OPEN_FILE = 0x00000076;
-constexpr int ERROR_OK = 0x00000077;
+namespace Crypto {
+
+    constexpr int ERROR_KDF_STRENGTH = 0x00000071;
+    constexpr int ERROR_KEYFILE_MISSING = 0x00000072;
+    constexpr int ERROR_DERIVE_KEY = 0x00000073;
+    constexpr int ERROR_DECRYPT = 0x00000074;
+    constexpr int ERROR_ENCRYPT = 0x00000075;
+    constexpr int ERROR_OPEN_FILE = 0x00000076;
+    constexpr int ERROR_OK = 0x00000077;
 
 
-enum FlagsCrypto {
-    DENIABILITY = 0,
-    COMPRESS = 1,
-    HEADER = 2,
-    ENCRYPT = 3,
-    DECRYPT = 4,
-    KEYFILE = 5
-};
+    enum FlagsCrypto {
+        DENIABILITY = 0,
+        COMPRESS = 1,
+        HEADER = 2,
+        ENCRYPT = 3,
+        DECRYPT = 4,
+        KEYFILE = 5,
+        HARD_RNG = 6
+    };
+}
 
 class CryptoManager {
 
     static const int IV_SIZE = 16;
-    static const int NONCE = 16;
     static const int KEY_SIZE = 32;
     static const int SALT_SIZE = 64;
     static const int HEADER_SIZE = 105;
@@ -45,32 +51,28 @@ class CryptoManager {
         Botan::secure_vector<uint8_t> iv;
     };
 
-    Botan::secure_vector<uint8_t> getHashFile(
-        std::string file,
-        std::string algo
-    );
-
 public:
 
     std::string cipherAlgo;
     bool compressFlag;
 
-    std::bitset<6> crypto_flags;
+    std::bitset<7> crypto_flags;
 
     std::vector<std::string> kdf;
     std::vector<std::string> algorithms;
 
     struct KdfParameters {
-        uint32_t kdf_strength;
-        uint32_t memory;
-        uint32_t time;
-        uint32_t parallelism;
+        size_t kdf_strength;
+        size_t memory;
+        size_t time;
+        size_t parallelism;
     }kdf_params;
 
     struct KeyParameters {
         Botan::secure_vector<uint8_t> key;
         Botan::secure_vector<uint8_t> salt;
         Botan::secure_vector<uint8_t> iv;
+        Botan::secure_vector<uint8_t> seed;
     }key_params;
 
     struct OptionalFetterHeader {
@@ -86,11 +88,11 @@ public:
         uint8_t reserved[96];
     }header;
 
-    unsigned int deriveKeyFromPassword(
+    size_t deriveKeyFromPassword(
         const std::string& password,
         KdfParameters& param,
         KeyParameters& keydata,
-        const std::bitset<6>& flag,
+        const std::bitset<7>& flag,
         const std::string& kdf,
         const std::string& keyfile
     );
@@ -100,7 +102,7 @@ public:
         const std::string& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
-        const std::bitset<6>& flag,
+        const std::bitset<7>& flag,
         const OptionalFetterHeader* header = nullptr
     );
 
@@ -109,9 +111,8 @@ public:
         const std::string& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
-        const std::bitset<6>& flag,
-        bool& stop,
-        const OptionalFetterHeader* header = nullptr
+        const std::bitset<7>& flag,
+        bool& stop
     );
 
     bool getKeyParameters(
@@ -129,11 +130,24 @@ public:
         uint8_t keyfileFlag
     );
 
+    Botan::secure_vector<uint8_t> getHashFile(
+        std::string file_path,
+        std::string algo
+    );
+
+    Botan::secure_vector<uint8_t> getHashData(
+        Botan::secure_vector<uint8_t> data,
+        std::string algo
+    );
+
     double calculateEntropy(const std::string& password);
 
     CryptoManager(const std::vector<std::string>& kdfInit, const std::vector<std::string>& algorithmsInit)
         : kdf(kdfInit), algorithms(algorithmsInit) {
     }
 
-    CryptoManager(){}
+    CryptoManager() = default;
+    ~CryptoManager() = default;
 };
+
+#endif

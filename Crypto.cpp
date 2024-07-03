@@ -1,52 +1,47 @@
-﻿#include "Crypto.h"
+﻿#include "EntropyDialog.h"
 
 Botan::secure_vector<uint8_t> CryptoManager::getHashFile(
-	std::string file,
+	std::string file_path,
 	std::string algo
 )
 {
-	Botan::secure_vector<uint8_t> result;
-	std::vector<uint8_t> buf(2048);
-
-	std::ifstream in(file, std::ios::binary);
-	if (!in.is_open())
-	{
-		return result;
-	}
-
 	try {
-		const auto hash = Botan::HashFunction::create_or_throw(algo);
+		std::vector<uint8_t> buffer;
 
-		while (in.good()) {
+		std::ifstream keyfile(file_path, std::ios::in | std::ios::binary);
+		if (!keyfile.is_open()){ throw std::exception(); }
 
-			in.read(reinterpret_cast<char*>(buf.data()), buf.size());
 
-			size_t readcount = in.gcount();
+		std::copy(std::istreambuf_iterator<char>(keyfile), std::istreambuf_iterator<char>(), std::back_inserter(buffer));
+		keyfile.close();
 
-			if (readcount > 0)
-			{
-				hash->update(buf.data(), readcount);
-			}
-		}
+		if(buffer.empty()) { throw std::exception(); }
 
-		result = hash->final();
+		return Botan::HashFunction::create_or_throw(algo)->process(buffer.data(), buffer.size());
 	}
 	catch (...) {
-
-		in.close();
 		return Botan::secure_vector<uint8_t>();
 	}
-
-	in.close();
-
-	return result;
 }
 
-unsigned int CryptoManager::deriveKeyFromPassword(
+Botan::secure_vector<uint8_t> CryptoManager::getHashData(
+	Botan::secure_vector<uint8_t> data,
+	std::string algo
+)
+{
+	try {
+		return Botan::HashFunction::create(algo)->process(data.data(), data.size());
+	}
+	catch (...) {
+		return Botan::secure_vector<uint8_t>();
+	}
+}
+
+size_t CryptoManager::deriveKeyFromPassword(
 	const std::string& password,
 	KdfParameters& param,
 	KeyParameters& keydata,
-	const std::bitset<6>& flag,
+	const std::bitset<7>& flag,
 	const std::string& kdf,
 	const std::string& keyfile
 )
@@ -55,27 +50,30 @@ unsigned int CryptoManager::deriveKeyFromPassword(
 		Botan::AutoSeeded_RNG rng;
 
 		keydata.key = Botan::secure_vector<uint8_t>(KEY_SIZE);
-		auto pwd_fam = Botan::PasswordHashFamily::create_or_throw(kdf);
 
-		if (flag.test(ENCRYPT) && !flag.test(KEYFILE))
+		if (flag.test(Crypto::ENCRYPT) && !flag.test(Crypto::KEYFILE))
 		{
 			keydata.salt = Botan::secure_vector<uint8_t>(SALT_SIZE);
-			rng.randomize(&keydata.salt[0], SALT_SIZE);
+
+			if (flag.test(Crypto::HARD_RNG)) {
+
+				if (!keydata.seed.size()) { throw std::exception(); }
+
+				rng.randomize_with_input(&keydata.salt[0], SALT_SIZE, keydata.seed.data(), keydata.seed.size());
+			}
+			else {
+				rng.randomize_with_ts_input(&keydata.salt[0], SALT_SIZE);
+			}
 		}
 
-		if ((flag.test(ENCRYPT) || flag.test(DECRYPT)) && flag.test(KEYFILE))
+		if ((flag.test(Crypto::ENCRYPT) || flag.test(Crypto::DECRYPT)) && flag.test(Crypto::KEYFILE))
 		{
-			if (keyfile.empty()) 
-				return ERROR_KEYFILE_MISSING;
-
+			if (keyfile.empty()) { throw std::exception(); }
+				
 			keydata.salt = getHashFile(keyfile, "Keccak-1600(512)");
 
-			if(keydata.salt.empty())
-				return ERROR_DERIVE_KEY;
+			if (keydata.salt.empty()) { throw std::exception(); }
 		}
-
-		if (param.kdf_strength < 0 || param.kdf_strength > 2) 
-			return ERROR_KDF_STRENGTH;
 
 		if (kdf == "Argon2id") {
 			switch (param.kdf_strength) {
@@ -92,16 +90,15 @@ unsigned int CryptoManager::deriveKeyFromPassword(
 			}
 		}
 
-		auto pwdhash = pwd_fam->from_params(param.memory, param.time, param.parallelism);
+		Botan::PasswordHashFamily::create_or_throw(kdf)->
+			from_params(param.memory, param.time, param.parallelism)->
+			hash(keydata.key, password, keydata.salt);
 
-		pwdhash->hash(keydata.key, password, keydata.salt);
+		return Crypto::ERROR_OK;
 	}
 	catch (...) {
-
-		return ERROR_DERIVE_KEY;
+		return Crypto::ERROR_DERIVE_KEY;
 	}
-
-	return 0;
 }
 
 size_t CryptoManager::encryptFile(
@@ -109,19 +106,19 @@ size_t CryptoManager::encryptFile(
 	const std::string& outputFilename,
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
-	const std::bitset<6>& flag,
+	const std::bitset<7>& flag,
 	const OptionalFetterHeader* header
 )
 {
 	std::ifstream in(inputFilename, std::ios::in | std::ios::binary);
 	if (!in.is_open()) {
-		return ERROR_OPEN_FILE;
+		return Crypto::ERROR_OPEN_FILE;
 	}
 
-	std::ofstream out(outputFilename, std::ios::out | std::ios::binary);
+	std::ofstream out(outputFilename, std::ios::noreplace | std::ios::out | std::ios::binary);
 	if (!out.is_open()) {
 		in.close();
-		return ERROR_OPEN_FILE;
+		return Crypto::ERROR_OPEN_FILE;
 	}
 
 	std::vector<uint8_t> buffer;
@@ -136,49 +133,49 @@ size_t CryptoManager::encryptFile(
 	Botan::secure_vector<uint8_t> iv_bits = iv.bits_of();
 
 	std::copy(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>(), std::back_inserter(buffer));
-	in.close();
 
-	if (flag.test(HEADER) && header != nullptr) {
-
+	if (flag.test(Crypto::HEADER) && header != nullptr)
+	{
 		out.write(reinterpret_cast<const char*>(header), sizeof(OptionalFetterHeader));
 	}
 
-	if (flag.test(KEYFILE)) {
-
+	if (flag.test(Crypto::KEYFILE)) {
+		// When a key file is used, salt is taken from it. But a random salt is still written to the encrypted file, which is not suitable for decrypting data
 		Botan::secure_vector<uint8_t> salt = Botan::secure_vector<uint8_t>(SALT_SIZE);
-		rng.randomize(&salt[0], SALT_SIZE);
+		rng.randomize_with_ts_input(&salt[0], SALT_SIZE);
 
-		out.write((const char*)iv_bits.data(), iv_bits.size());
-		out.write((const char*)salt.data(), salt.size());
+		out.write(reinterpret_cast<const char*>(iv_bits.data()), iv_bits.size());
+		out.write(reinterpret_cast<const char*>(salt.data()), salt.size());
 	}
 	else {
-		out.write((const char*)iv_bits.data(), iv_bits.size());
-		out.write((const char*)keyparams.salt.data(), keyparams.salt.size());
+		out.write(reinterpret_cast<const char*>(iv_bits.data()), iv_bits.size());
+		out.write(reinterpret_cast<const char*>(keyparams.salt.data()), keyparams.salt.size());
 	}
 
-	if (flag.test(COMPRESS)) {
+	if (flag.test(Crypto::COMPRESS)) {
 		pipe = std::make_unique<Botan::Pipe>(
 			new Botan::Compression_Filter("bzip2", 9),
 			Botan::get_cipher(selectedCipher, key, iv, Botan::Cipher_Dir::Encryption),
 			new Botan::DataSink_Stream(out));
 	} else {
-			pipe = std::make_unique<Botan::Pipe>(Botan::get_cipher(selectedCipher, key, iv, Botan::Cipher_Dir::Encryption), new Botan::DataSink_Stream(out));
+		pipe = std::make_unique<Botan::Pipe>(
+			Botan::get_cipher(selectedCipher, key, iv, Botan::Cipher_Dir::Encryption), 
+			new Botan::DataSink_Stream(out));
 	}
 
 	pipe->process_msg(buffer.data(), buffer.size());
+
+	in.close();
+	out.close();
+	return Crypto::ERROR_OK;
 	}
 	catch (...)
 	{
-		std::vector<uint8_t>().swap(buffer);
+		in.close();
 		out.close();
 
-		return ERROR_ENCRYPT;
+		return Crypto::ERROR_ENCRYPT;
 	}
-
-	std::vector<uint8_t>().swap(buffer);
-	out.close();
-
-	return ERROR_OK;
 }
 
 size_t CryptoManager::decryptFile(
@@ -186,28 +183,27 @@ size_t CryptoManager::decryptFile(
 	const std::string& outputFilename,
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
-	const std::bitset<6>& flag,
-	bool& stop,
-	const OptionalFetterHeader* header
+	const std::bitset<7>& flag,
+	bool& stop
 ) {
 	std::vector<uint8_t> buffer;
 
 	std::ifstream in(inputFilename, std::ios::in | std::ios::binary);
 	if (!in.is_open()) {
-		return ERROR_OPEN_FILE;
+		return Crypto::ERROR_OPEN_FILE;
 	}
 
 	std::ofstream out(outputFilename, std::ios::out | std::ios::binary);
 	if (!out.is_open()) {
 		in.close();
-		return ERROR_OPEN_FILE;
+		return Crypto::ERROR_OPEN_FILE;
 	}
 
 	Botan::SymmetricKey key(keyparams.key.data(), keyparams.key.size());
 	Botan::InitializationVector iv(keyparams.iv.data(), keyparams.iv.size());
 	std::unique_ptr<Botan::Pipe> pipe;
 
-	if (flag.test(HEADER)) {
+	if (flag.test(Crypto::HEADER)) {
 
 		in.seekg(IV_SIZE + SALT_SIZE + HEADER_SIZE);
 		std::copy(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>(), std::back_inserter(buffer));
@@ -220,7 +216,7 @@ size_t CryptoManager::decryptFile(
 		in.close();
 	}
 
-	if (!flag.test(HEADER)) {
+	if (!flag.test(Crypto::HEADER)) {
 		for (const auto& algorithm : algorithms) {
 			if (stop) continue;
 
@@ -268,26 +264,24 @@ size_t CryptoManager::decryptFile(
 					out.seekp(0);
 					in.seekg(IV_SIZE + SALT_SIZE);
 				}
-				catch (Botan::Invalid_State& e) {
+				catch (Botan::Invalid_State) {
 
 					std::vector<uint8_t>().swap(buffer);
 					out.close();
-
-					return ERROR_DECRYPT;
+					return Crypto::ERROR_DECRYPT;
 				}
 				catch (...) {
 
 					std::vector<uint8_t>().swap(buffer);
 					out.close();
-
-					return ERROR_DECRYPT;
+					return Crypto::ERROR_DECRYPT;
 				}
 			}
 		}
 	}
 	else {
 		try {
-			if (flag.test(COMPRESS)) {
+			if (flag.test(Crypto::COMPRESS)) {
 
 				pipe.reset();
 				pipe = std::make_unique<Botan::Pipe>(
@@ -306,27 +300,23 @@ size_t CryptoManager::decryptFile(
 
 		pipe->process_msg(buffer.data(), buffer.size());
 
+		out.close();
+
+		return Crypto::ERROR_OK;
 		}
 		catch (Botan::Invalid_Authentication_Tag) {
-
-			std::vector<uint8_t>().swap(buffer);
 			out.close();
-
-			return ERROR_DECRYPT;
+			return Crypto::ERROR_DECRYPT;
 		}
 		catch (...) {
 
 			std::vector<uint8_t>().swap(buffer);
 			out.close();
 
-			return ERROR_DECRYPT;
+			return Crypto::ERROR_DECRYPT;
 		}
 	}
-
-	std::vector<uint8_t>().swap(buffer);
-	out.close();
-
-	return ERROR_OK;
+	return Crypto::ERROR_OK;
 }
 
 bool CryptoManager::getKeyParameters(
@@ -367,8 +357,8 @@ bool CryptoManager::getKeyParameters(
 		return false;
 	}
 
-	keyparams.iv = iv;
-	keyparams.salt = salt;
+	keyparams.iv = std::move(iv);
+	keyparams.salt = std::move(salt);
 
 	in.close();
 

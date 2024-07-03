@@ -1,6 +1,7 @@
 ﻿#include "EncryptFrame.h"
 #include "Crypto.h"
-#include "Errors.h"
+
+#include "EntropyDialog.h"
 
 namespace fs = std::filesystem;
 
@@ -9,10 +10,10 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	wxNotebook* notebook = new wxNotebook(this, wxID_ANY);
 
 	wxPanel* crypto = new wxPanel(notebook);
-	//wxPanel* hashing = new wxPanel(notebook);
+	wxPanel* hasher = new wxPanel(notebook);
 
 	notebook->AddPage(crypto, "File encryption");
-	//notebook->AddPage(hashing, "Hasher");
+	notebook->AddPage(hasher, "Hasher");
 
 	// StaticBox "Enter password"
 	wxStaticBox* password_box = new wxStaticBox(crypto, wxID_ANY, "Enter password", wxPoint(520, 10), wxSize(270, 240));
@@ -32,12 +33,12 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 
 	key_file = new wxButton(crypto, wxID_ANY, "KeyFile", wxPoint(530, 160), wxSize(70, 25));
 
-	hWndPassword = (HWND)passText->GetHandle();
-	SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, (WPARAM)'*', 0);
+	hWndPassword = static_cast<HWND>(passText->GetHandle());
+	SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
 	passText->Refresh();
 
-	hWndConfirmPassword = (HWND)confPassText->GetHandle();
-	SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, (WPARAM)'*', 0);
+	hWndConfirmPassword = static_cast<HWND>(confPassText->GetHandle());
+	SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
 	confPassText->Refresh();
 
 
@@ -58,7 +59,11 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	compress_flag	= new wxCheckBox(crypto, wxID_ANY, "Compress", wxPoint(530, 435));
 	delete_flag		= new wxCheckBox(crypto, wxID_ANY, "Delete original", wxPoint(530, 455));
 	keyfile_flag	= new wxCheckBox(crypto, wxID_ANY, "Keyfile", wxPoint(670, 415));
+	hard_rng_flag	= new wxCheckBox(crypto, wxID_ANY, "Hard PRNG", wxPoint(670, 435));
 	header_flag		= new wxCheckBox(crypto, wxID_ANY, "Header enabled", wxPoint(530, 415));
+
+	compress_flag->SetToolTip(new wxToolTip("You should always compress before you encrypt, because encryption seeks to hide the redundancy that compression is supposed to try to find and remove"));
+	header_flag->SetToolTip(new wxToolTip("Adding a header greatly speeds up the decryption speed, but significantly weakens the defense because the attacker becomes aware of the encryption algorithms used"));
 
 	progress_pass = new wxGauge(crypto, wxID_ANY, 100, wxPoint(530, 225), wxSize(250, 15));
 
@@ -128,7 +133,144 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 
 	// Note Hashing
 
+	wxStaticBox* settings_hash = new wxStaticBox(hasher, wxID_ANY, "Hash from:", wxPoint(670, 360), wxSize(120, 90));
 
+	open_hash_file = new wxButton(hasher, wxID_ANY, "Open file", wxPoint(0, 405), wxSize(170, 45));
+	open_hash_file->Bind(wxEVT_BUTTON, &EncryptFrame::OnOpenHashFile, this);
+
+	wxStaticText* sha3 = new wxStaticText(hasher, wxID_ANY, "SHA3:", wxPoint(5, 15), wxSize(50, 15));
+	wxStaticText* sha512 = new wxStaticText(hasher, wxID_ANY, "SHA512:", wxPoint(5, 60), wxSize(50, 15));
+	wxStaticText* blake2b = new wxStaticText(hasher, wxID_ANY, "Blake2b:", wxPoint(5, 105), wxSize(50, 15));
+	wxStaticText* skein512 = new wxStaticText(hasher, wxID_ANY, "Skein:", wxPoint(5, 150), wxSize(50, 15));
+
+	wxStaticText* blake2s = new wxStaticText(hasher, wxID_ANY, "Blake2s:", wxPoint(5, 195), wxSize(50, 15));
+	wxStaticText* sha256 = new wxStaticText(hasher, wxID_ANY, "SHA256:", wxPoint(5, 220), wxSize(50, 15));
+
+	wxStaticText* text = new wxStaticText(hasher, wxID_ANY, "Text:", wxPoint(5, 260), wxSize(50, 15));
+
+	wxStaticText* path = new wxStaticText(hasher, wxID_ANY, "Path:", wxPoint(5, 345), wxSize(50, 15));
+
+	sha3Text = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 15), wxSize(730, 40), wxTE_MULTILINE);
+	sha3Text->SetEditable(false);
+	sha512Text = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 60), wxSize(730, 40), wxTE_MULTILINE);
+	sha512Text->SetEditable(false);
+	blake2bText = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 105), wxSize(730, 40), wxTE_MULTILINE);
+	blake2bText->SetEditable(false);
+	skeinText = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 150), wxSize(730, 40), wxTE_MULTILINE);
+	skeinText->SetEditable(false);
+
+	blake2sText = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 195), wxSize(730, 20), wxST_NO_AUTORESIZE);
+	blake2sText->SetEditable(false);
+	sha256Text = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 220), wxSize(730, 20), wxST_NO_AUTORESIZE);
+	sha256Text->SetEditable(false);
+
+	hashText = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 260), wxSize(730, 80), wxTE_MULTILINE);
+	hashText->Enable(false);
+
+	progress_hash = new wxGauge(hasher, wxID_ANY, 100, wxPoint(0, 455), wxSize(790, 25));
+
+	wxRadioButton* radioFile = new wxRadioButton(hasher, wxID_ANY, "File", wxPoint(680, 385), wxDefaultSize, wxRB_GROUP);
+	wxRadioButton* radioText = new wxRadioButton(hasher, wxID_ANY, "Text", wxPoint(680, 420), wxDefaultSize);
+
+	Connect(radioFile->GetId(), wxEVT_RADIOBUTTON, wxCommandEventHandler(EncryptFrame::OnRadioFileSelected));
+	Connect(radioText->GetId(), wxEVT_RADIOBUTTON, wxCommandEventHandler(EncryptFrame::OnRadioTextSelected));
+}
+
+void EncryptFrame::OnRadioTextSelected(wxCommandEvent& event)
+{
+	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
+	if (radioButton)
+	{
+		hashText->Enable(true);
+		open_hash_file->SetLabel("Hash Text");
+		boolHashText = true;
+	}
+
+	wxString text = hashText->GetValue();
+}
+
+void EncryptFrame::OnRadioFileSelected(wxCommandEvent& event)
+{
+	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
+	if (radioButton)
+	{
+		hashText->Enable(false);
+		open_hash_file->SetLabel("Open File");
+		boolHashText = false;
+	}
+}
+
+void EncryptFrame::OnOpenHashFile(wxCommandEvent& event)
+{
+	CryptoManager hasher;
+
+	if (boolHashText) {
+
+		wxString text_for_hash = hashText->GetValue();
+
+		std::vector<std::pair<std::string, size_t>> hashAlgorithms = {
+		{"SHA-3(512)", 512},
+		{"SHA-512", 512},
+		{"SHA-256", 256},
+		{"Skein-512(512)", 512},
+		{"BLAKE2b(512)", 512},
+		{"BLAKE2s(256)", 256}
+		};
+
+		std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
+
+		Botan::secure_vector<uint8_t> vec;
+
+		vec.resize(text_for_hash.size());
+		std::copy(text_for_hash.begin(), text_for_hash.end(), vec.begin());
+
+		std::vector<wxTextCtrl*> textControls = {
+			sha3Text, sha512Text, sha256Text, skeinText, blake2bText, blake2sText
+		};
+
+		for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
+			hashResults[i] = hasher.getHashData(vec, hashAlgorithms[i].first);
+			if (!hashResults[i].empty()) {
+				textControls[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
+			}
+			else {
+				textControls[i]->SetLabelText("Error: Unable to generate hash");
+			}
+		}
+	}
+	else {
+	wxFileDialog openFileDialog(this, _("Open Key File"), "", "",
+		"All files (*.*)|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+	if (openFileDialog.ShowModal() == wxID_CANCEL) { return; }
+
+	fullPathKeyFile = openFileDialog.GetPath();
+
+	std::vector<std::pair<std::string, size_t>> hashAlgorithms = {
+	{"SHA-3(512)", 512},
+	{"SHA-512", 512},
+	{"SHA-256", 256},
+	{"Skein-512(512)", 512},
+	{"BLAKE2b(512)", 512},
+	{"BLAKE2s(256)", 256}
+	};
+
+	std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
+
+	std::vector<wxTextCtrl*> textControls = {
+		sha3Text, sha512Text, sha256Text, skeinText, blake2bText, blake2sText
+	};
+
+	for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
+		hashResults[i] = hasher.getHashFile(fullPathKeyFile.ToStdString(), hashAlgorithms[i].first);
+		if (!hashResults[i].empty()) {
+			textControls[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
+		}
+		else {
+			textControls[i]->SetLabelText("Error: Unable to generate hash");
+		}
+	}
+	}
 }
 
 void EncryptFrame::OnCipherChoice(wxCommandEvent& event)
@@ -200,8 +342,8 @@ void EncryptFrame::OnHidePassBox(wxCommandEvent& event)
 	}
 	else
 	{
-		SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, (WPARAM)'*', 0);
-		SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, (WPARAM)'*', 0);
+		SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
+		SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
 
 		passText->Refresh();
 		confPassText->Refresh();
@@ -221,8 +363,7 @@ void EncryptFrame::OnOpenCryptFile(wxCommandEvent& event)
 	wxFileDialog openFileDialog(this, _("Open File"), "", "",
 		"All files (*.*)|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE);
 
-	if (openFileDialog.ShowModal() == wxID_CANCEL)
-		return;
+	if (openFileDialog.ShowModal() == wxID_CANCEL) { return; }
 
 	openFileDialog.GetPaths(files);
 
@@ -291,8 +432,7 @@ void EncryptFrame::OnOpenKeyFile(wxCommandEvent& event)
 	wxFileDialog openFileDialog(this, _("Open Key File"), "", "",
 		"All files (*.*)|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
-	if (openFileDialog.ShowModal() == wxID_CANCEL)
-		return;
+	if (openFileDialog.ShowModal() == wxID_CANCEL) { return; }
 
 	fullPathKeyFile = openFileDialog.GetPath();
 
@@ -363,7 +503,7 @@ void EncryptFrame::UpdateStatus(
 	wxStaticText* textKdfStrenth,
 	wxStaticText* textCipher,
 	const wxString& selectedKdf,
-	uint32_t kdf_strength,
+	size_t kdf_strength,
 	const wxString& selectedCipher,
 	bool header,
 	bool compress,
@@ -412,9 +552,9 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 {
 	Botan::AutoSeeded_RNG rng;
 
-	unsigned int status = 0;
+	size_t status = 0;
 	wxString output;
-	int kdfID, cipherID;
+	size_t kdfID, cipherID;
 	float progress;
 
 	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
@@ -457,20 +597,40 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 
 	if (keyfile_flag->GetValue()) {
 
-		encrypt.crypto_flags.set(KEYFILE);
-		encrypt.crypto_flags.set(ENCRYPT);
+		encrypt.crypto_flags.set(Crypto::KEYFILE);
+		encrypt.crypto_flags.set(Crypto::ENCRYPT);
 
 	}
 	else {
-		encrypt.crypto_flags.set(ENCRYPT);
+		encrypt.crypto_flags.set(Crypto::ENCRYPT);
 	}
 
 	if (compress_flag->GetValue()) {
-		encrypt.crypto_flags.set(COMPRESS);
+		encrypt.crypto_flags.set(Crypto::COMPRESS);
+	}
+
+	if (hard_rng_flag->GetValue()) {
+
+		encrypt.crypto_flags.set(Crypto::HARD_RNG);
+
+		EntropyDialog* dialog = new EntropyDialog(this, wxID_ANY, "Entropy Collector");
+
+		dialog->SetMinSize(wxSize(815, 550));
+		dialog->ShowModal();
+
+		encrypt.key_params.seed = encrypt.getHashData(dialog->GetMouseEntropy(), "Skein-512");
+
+		if (encrypt.key_params.seed.empty()) {
+
+			delete dialog;
+			return;
+		}
+
+		delete dialog;
 	}
 
 	if (keyfile_flag->GetValue() &&
-		encrypt.crypto_flags.test(KEYFILE) &&
+		encrypt.crypto_flags.test(Crypto::KEYFILE) &&
 		fullPathKeyFile.empty())
 	{
 		wxMessageBox(_("Keyfile path are empty"), _("KeyFile"), wxOK | wxICON_ERROR, this);
@@ -479,7 +639,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 
 	if (header_flag->GetValue())
 	{
-		encrypt.crypto_flags.set(HEADER);
+		encrypt.crypto_flags.set(Crypto::HEADER);
 	}
 
 	if (kdf_choice->GetStringSelection() == "Auto")
@@ -497,8 +657,8 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 			fullPathKeyFile.ToStdString()
 		);
 
-		if (status == ERROR_DERIVE_KEY || 
-			status == ERROR_KEYFILE_MISSING) {
+		if (status == Crypto::ERROR_DERIVE_KEY ||
+			status == Crypto::ERROR_KEYFILE_MISSING) {
 			
 			wxMessageBox(_("Encryption error"), _("Encrypt"), wxOK | wxICON_ERROR, this);
 			return; 
@@ -508,7 +668,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 	{
 		kdfID = kdf_choice->GetSelection();
 
-		encrypt.crypto_flags.test(HEADER) ?
+		encrypt.crypto_flags.test(Crypto::HEADER) ?
 			selectedKdf = encrypt.kdf[kdfID] : selectedKdf = encrypt.kdf[--kdfID];
 
 		status = encrypt.deriveKeyFromPassword(
@@ -520,8 +680,8 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 			fullPathKeyFile.ToStdString()
 		);
 
-		if (status == ERROR_DERIVE_KEY || 
-			status == ERROR_KEYFILE_MISSING) {
+		if (status == Crypto::ERROR_DERIVE_KEY ||
+			status == Crypto::ERROR_KEYFILE_MISSING) {
 			
 			wxMessageBox(_("Encryption error"), _("Encrypt"), wxOK | wxICON_ERROR, this);
 			return; 
@@ -538,7 +698,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 
 		cipherID = cipher_choice->GetSelection();
 
-		encrypt.crypto_flags.test(HEADER) ?
+		encrypt.crypto_flags.test(Crypto::HEADER) ?
 			selectedCipher = encrypt.algorithms[cipherID] : selectedCipher = encrypt.algorithms[--cipherID];
 	}
 
@@ -555,7 +715,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 	{
 		output = generateNewFileName(files[i], i);
 
-		progress = static_cast<float>((i + 1) * 100) / files.GetCount();
+		progress = (i + 1) * 100 / files.GetCount();
 		progress_crypt->SetValue(static_cast<int>(progress));
 		wxYield();
 
@@ -566,9 +726,9 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 			selectedKdf,
 			encrypt.kdf_params.kdf_strength,
 			selectedCipher,
-			encrypt.crypto_flags.test(HEADER),
-			encrypt.crypto_flags.test(COMPRESS),
-			encrypt.crypto_flags.test(KEYFILE),
+			encrypt.crypto_flags.test(Crypto::HEADER),
+			encrypt.crypto_flags.test(Crypto::COMPRESS),
+			encrypt.crypto_flags.test(Crypto::KEYFILE),
 			encrypt.key_params.iv,
 			encrypt.key_params.salt,
 			encrypt.key_params.key
@@ -598,9 +758,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
 
 	size_t status = 0;
-
 	CryptoManager decrypt(kdf, algorithms);
-
 	wxString output;
 	float progress;
 
@@ -628,18 +786,18 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 
 			decrypt.crypto_flags.reset();
 
-			decrypt.crypto_flags.set(HEADER);
+			decrypt.crypto_flags.set(Crypto::HEADER);
 
 			if (decrypt.header.compressFlag) {
-				decrypt.crypto_flags.set(COMPRESS);
+				decrypt.crypto_flags.set(Crypto::COMPRESS);
 			}
 
 			if (decrypt.header.keyfileFlag) {
-				decrypt.crypto_flags.set(KEYFILE);
-				decrypt.crypto_flags.set(DECRYPT);
+				decrypt.crypto_flags.set(Crypto::KEYFILE);
+				decrypt.crypto_flags.set(Crypto::DECRYPT);
 			}
 			else {
-				decrypt.crypto_flags.set(DECRYPT);
+				decrypt.crypto_flags.set(Crypto::DECRYPT);
 			}
 
 			decrypt.kdf_params.kdf_strength = decrypt.header.kdfStrength;
@@ -654,7 +812,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				(decrypt.header.encryptionAlgorithmID == 2) ? "Twofish/GCM(16)" :
 				(decrypt.header.encryptionAlgorithmID == 3) ? "Camellia-256/GCM(16)" : "";
 
-			progress = static_cast<float>((i + 1) * 100) / files.GetCount();
+			progress = (i + 1) * 100 / files.GetCount();
 			progress_crypt->SetValue(static_cast<int>(progress));
 			wxYield();
 
@@ -667,8 +825,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				fullPathKeyFile.ToStdString()
 			);
 
-			if (status == ERROR_DERIVE_KEY || 
-				status == ERROR_KEYFILE_MISSING) {
+			if (status == Crypto::ERROR_DERIVE_KEY ||
+				status == Crypto::ERROR_KEYFILE_MISSING) {
 
 				wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
 				return;
@@ -681,7 +839,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				selectedKdf,
 				decrypt.kdf_params.kdf_strength,
 				selectedCipher,
-				decrypt.crypto_flags.test(HEADER),
+				decrypt.crypto_flags.test(Crypto::HEADER),
 				decrypt.header.compressFlag,
 				decrypt.header.keyfileFlag,
 				decrypt.key_params.iv,
@@ -697,8 +855,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				decrypt.key_params, 
 				selectedCipher, 
 				decrypt.crypto_flags, 
-				stop_flag, 
-				&decrypt.header
+				stop_flag
 			);
 		}
 		else { // No header
@@ -707,22 +864,22 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 			decrypt.crypto_flags.reset();
 
 			if (keyfile_flag->GetValue()) {
-				decrypt.crypto_flags.set(KEYFILE);
-				decrypt.crypto_flags.set(DECRYPT);
+				decrypt.crypto_flags.set(Crypto::KEYFILE);
+				decrypt.crypto_flags.set(Crypto::DECRYPT);
 			}
 			else {
-				decrypt.crypto_flags.set(DECRYPT);
+				decrypt.crypto_flags.set(Crypto::DECRYPT);
 			}
 
 			for (size_t x = 0; x < 3; x++) {
 
-				if (stop_flag) continue;
+				if (stop_flag) { continue; }
 
 				decrypt.kdf_params.kdf_strength = x;
 
-				for (int x = 0; x < decrypt.kdf.size(); x++)
+				for (size_t x = 0; x < decrypt.kdf.size(); x++)
 				{
-					if (stop_flag) continue;
+					if (stop_flag) { continue; }
 
 					selectedKdf = decrypt.kdf[x];
 
@@ -735,8 +892,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 						fullPathKeyFile.ToStdString()
 					);
 
-					if (status == ERROR_DERIVE_KEY || 
-						status == ERROR_KEYFILE_MISSING) {
+					if (status == Crypto::ERROR_DERIVE_KEY ||
+						status == Crypto::ERROR_KEYFILE_MISSING) {
 
 						wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
 						return;
@@ -768,15 +925,13 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 						stop_flag
 					);
 
-					if (status == ERROR_DECRYPT) {
-
+					if (status == Crypto::ERROR_DECRYPT) {
 						wxMessageBox(_("Decryption error"), _("Decrypt"), wxOK | wxICON_ERROR, this);
-
 					}
 				}
 			}
 
-			progress = static_cast<float>((i + 1) * 100) / files.GetCount();
+			progress = (i + 1) * 100 / files.GetCount();
 			progress_crypt->SetValue(static_cast<int>(progress));
 			wxYield();
 		}

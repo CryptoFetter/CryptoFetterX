@@ -1,4 +1,8 @@
-﻿#include <wx/wx.h>
+﻿#ifndef ENCRYPT_FRAME_H
+#define ENCRYPT_FRAME_H
+
+
+#include <wx/wx.h>
 
 #include <wx/listctrl.h>
 #include <wx/notebook.h>
@@ -24,6 +28,7 @@ class EncryptFrame : public wxFrame
     wxCheckBox* delete_flag;
     wxCheckBox* keyfile_flag;
     wxCheckBox* header_flag;
+    wxCheckBox* hard_rng_flag;
 
     wxButton* encryptButton;
     wxButton* decryptButton;
@@ -37,9 +42,21 @@ class EncryptFrame : public wxFrame
     wxString fullPathKeyFile;
     wxString outputPathCryptFile;
 
+    wxString fullPathHashFile;
+
+    wxTextCtrl* sha3Text;
+    wxTextCtrl* sha512Text;
+    wxTextCtrl* blake2bText;
+    wxTextCtrl* blake2sText;
+    wxTextCtrl* skeinText;
+    wxTextCtrl* sha256Text;
+
+    wxTextCtrl* hashText;
+
     wxTextCtrl* textCtrlPassword;
     wxTextCtrl* textCtrlPlainText;
 
+    wxGauge* progress_hash;
     wxGauge* progress_crypt;
     wxGauge* progress_pass;
 
@@ -71,6 +88,10 @@ class EncryptFrame : public wxFrame
     wxStaticText* textSalt;
     wxStaticText* textKey;
 
+    bool boolHashText;
+
+    wxButton* open_hash_file;
+
     void OnEnterPass(wxCommandEvent& event);
 
     void OnKdfChoice(wxCommandEvent& event);
@@ -98,12 +119,14 @@ public:
 
     void OnSaveOutputFolder(wxCommandEvent& event);
 
+    void OnOpenHashFile(wxCommandEvent& event);
+
     void UpdateStatus(
         wxStaticText* textKdf,
         wxStaticText* textKdfStrenth,
         wxStaticText* textCipher,
         const wxString& selectedKdf,
-        uint32_t kdf_strength,
+        size_t kdf_strength,
         const wxString& selectedCipher,
         bool header,
         bool compress,
@@ -114,4 +137,12 @@ public:
     );
 
     wxString generateNewFileName(const wxString& originalFileName, size_t index);
+
+    void OnRadioFileSelected(wxCommandEvent& event);
+    void OnRadioTextSelected(wxCommandEvent& event);
+
+    EncryptFrame() = default;
+    ~EncryptFrame() = default;
 };
+
+#endif
