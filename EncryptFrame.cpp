@@ -87,26 +87,22 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	textKey			= new wxStaticText(crypto, wxID_ANY, wxEmptyString, wxPoint(15, 375), wxSize(495, 20), wxST_NO_AUTORESIZE);
 
 	wxArrayString selectCipher;
-	selectCipher.Add("Auto");
-	selectCipher.Add("AES-256");
-	selectCipher.Add("Serpent-256");
-	selectCipher.Add("Twofish-256");
-	selectCipher.Add("Camelia-256");
+
+	for (const auto& algorithm : cipherAlgorithms) {
+		selectCipher.Add(algorithm.second);
+	}
 
 	cipher_choice = new wxChoice(crypto, wxID_ANY, wxPoint(655, 285), wxSize(125, 30), selectCipher);
 	cipher_choice->Select(0);
 
-	cipher_choice->Bind(wxEVT_CHOICE, &EncryptFrame::OnCipherChoice, this);
-
 	wxArrayString selectKdf;
-	selectKdf.Add("Auto");
-	selectKdf.Add("Argon2id");
-	selectKdf.Add("Scrypt");
+
+	for (const auto& algorithm : kdfAlgorithms) {
+		selectKdf.Add(algorithm.second);
+	}
 
 	kdf_choice = new wxChoice(crypto, wxID_ANY, wxPoint(655, 325), wxSize(125, 30), selectKdf);
 	kdf_choice->Select(0);
-
-	kdf_choice->Bind(wxEVT_CHOICE, &EncryptFrame::OnKdfChoice, this);
 
 	kdf_slider = new wxSlider(crypto, wxID_ANY, 0, 0, 2, wxPoint(655, 365), wxSize(125, 30));
 
@@ -132,7 +128,6 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	outputFolderStaticText = new wxStaticText(crypto, wxID_ANY, "", wxPoint(260, 170), wxSize(250, 20), wxST_NO_AUTORESIZE);
 
 	// Note Hashing
-
 	wxStaticBox* settings_hash = new wxStaticBox(hasher, wxID_ANY, "Hash from:", wxPoint(670, 360), wxSize(120, 90));
 
 	open_hash_file = new wxButton(hasher, wxID_ANY, "Open file", wxPoint(0, 405), wxSize(170, 45));
@@ -148,7 +143,7 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 
 	wxStaticText* text = new wxStaticText(hasher, wxID_ANY, "Text:", wxPoint(5, 260), wxSize(50, 15));
 
-	wxStaticText* path = new wxStaticText(hasher, wxID_ANY, "Path:", wxPoint(5, 345), wxSize(50, 15));
+	pathHashFile = new wxStaticText(hasher, wxID_ANY, "Path:", wxPoint(5, 345), wxSize(50, 30));
 
 	sha3Text = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 15), wxSize(730, 40), wxTE_MULTILINE);
 	sha3Text->SetEditable(false);
@@ -179,11 +174,17 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 void EncryptFrame::OnRadioTextSelected(wxCommandEvent& event)
 {
 	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
+	auto textHashes = getTextHashes();
 	if (radioButton)
 	{
+		hashText->Clear();
 		hashText->Enable(true);
 		open_hash_file->SetLabel("Hash Text");
 		boolHashText = true;
+
+		for (size_t x = 0; x < textHashes.size(); ++x) textHashes[x]->Clear();
+
+		pathHashFile->SetLabelText("Path: ");
 	}
 
 	wxString text = hashText->GetValue();
@@ -192,11 +193,19 @@ void EncryptFrame::OnRadioTextSelected(wxCommandEvent& event)
 void EncryptFrame::OnRadioFileSelected(wxCommandEvent& event)
 {
 	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
+	auto textHashes = getTextHashes();
+
 	if (radioButton)
 	{
+
+		hashText->Clear();
 		hashText->Enable(false);
 		open_hash_file->SetLabel("Open File");
 		boolHashText = false;
+
+		for (size_t x = 0; x < textHashes.size(); ++x) textHashes[x]->Clear();
+
+		pathHashFile->SetLabelText("Path: ");
 	}
 }
 
@@ -204,18 +213,11 @@ void EncryptFrame::OnOpenHashFile(wxCommandEvent& event)
 {
 	CryptoManager hasher;
 
+	auto textHashes = getTextHashes();
+
 	if (boolHashText) {
 
 		wxString text_for_hash = hashText->GetValue();
-
-		std::vector<std::pair<std::string, size_t>> hashAlgorithms = {
-		{"SHA-3(512)", 512},
-		{"SHA-512", 512},
-		{"SHA-256", 256},
-		{"Skein-512(512)", 512},
-		{"BLAKE2b(512)", 512},
-		{"BLAKE2s(256)", 256}
-		};
 
 		std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
 
@@ -224,17 +226,13 @@ void EncryptFrame::OnOpenHashFile(wxCommandEvent& event)
 		vec.resize(text_for_hash.size());
 		std::copy(text_for_hash.begin(), text_for_hash.end(), vec.begin());
 
-		std::vector<wxTextCtrl*> textControls = {
-			sha3Text, sha512Text, sha256Text, skeinText, blake2bText, blake2sText
-		};
-
 		for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
 			hashResults[i] = hasher.getHashData(vec, hashAlgorithms[i].first);
 			if (!hashResults[i].empty()) {
-				textControls[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
+				textHashes[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
 			}
 			else {
-				textControls[i]->SetLabelText("Error: Unable to generate hash");
+				textHashes[i]->SetLabelText("Error: Unable to generate hash");
 			}
 		}
 	}
@@ -244,88 +242,21 @@ void EncryptFrame::OnOpenHashFile(wxCommandEvent& event)
 
 	if (openFileDialog.ShowModal() == wxID_CANCEL) { return; }
 
-	fullPathKeyFile = openFileDialog.GetPath();
+	fullPathHashFile = openFileDialog.GetPath();
 
-	std::vector<std::pair<std::string, size_t>> hashAlgorithms = {
-	{"SHA-3(512)", 512},
-	{"SHA-512", 512},
-	{"SHA-256", 256},
-	{"Skein-512(512)", 512},
-	{"BLAKE2b(512)", 512},
-	{"BLAKE2s(256)", 256}
-	};
+	pathHashFile->SetLabelText("Path: " + fullPathHashFile);
 
 	std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
 
-	std::vector<wxTextCtrl*> textControls = {
-		sha3Text, sha512Text, sha256Text, skeinText, blake2bText, blake2sText
-	};
-
 	for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
-		hashResults[i] = hasher.getHashFile(fullPathKeyFile.ToStdString(), hashAlgorithms[i].first);
+		hashResults[i] = hasher.getHashFile(fullPathHashFile.ToStdString(), hashAlgorithms[i].first);
 		if (!hashResults[i].empty()) {
-			textControls[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
+			textHashes[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
 		}
 		else {
-			textControls[i]->SetLabelText("Error: Unable to generate hash");
+			textHashes[i]->SetLabelText("Error: Unable to generate hash");
 		}
 	}
-	}
-}
-
-void EncryptFrame::OnCipherChoice(wxCommandEvent& event)
-{
-	wxChoice* choice = dynamic_cast<wxChoice*>(event.GetEventObject());
-
-	if (choice)
-	{
-		int selectedCipherNum = choice->GetSelection();
-
-		switch (selectedCipherNum)
-		{
-		case 0:
-			selectedCipher = "Auto";
-			break;
-		case 1:
-			selectedCipher = "AES-256/GCM";
-			break;
-		case 2:
-			selectedCipher = "Serpent/GCM";
-			break;
-		case 3:
-			selectedCipher = "Twofish/GCM";
-			break;
-		case 4:
-			selectedCipher = "Camellia-256/GCM";
-			break;
-		default:
-			selectedCipher = "Auto";
-			break;
-		}
-	}
-}
-
-void EncryptFrame::OnKdfChoice(wxCommandEvent& event)
-{
-	wxChoice* choice = dynamic_cast<wxChoice*>(event.GetEventObject());
-
-	if (choice)
-	{
-		switch (choice->GetSelection())
-		{
-		case 0:
-			selectedKdf = "Auto";
-			break;
-		case 1:
-			selectedKdf = "Argon2id";
-			break;
-		case 2:
-			selectedKdf = "Scrypt";
-			break;
-		default:
-			selectedKdf = "Auto";
-			break;
-		}
 	}
 }
 
@@ -557,10 +488,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 	size_t kdfID, cipherID;
 	float progress;
 
-	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
-	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
-
-	CryptoManager encrypt(kdf, algorithms);
+	CryptoManager encrypt;
 
 	wxString pass = passText->GetValue();
 	wxFileName filePath1(output);
@@ -644,9 +572,13 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 
 	if (kdf_choice->GetStringSelection() == "Auto")
 	{
-		kdfID = rng.next_byte() / 128;
 
-		selectedKdf = encrypt.kdf[kdfID];
+		int lower_bound = 1;
+		int upper_bound = kdfAlgorithms.size() - 1;
+
+		kdfID = lower_bound + (rng.next_byte() % (upper_bound - lower_bound + 1));
+
+		selectedKdf = kdfAlgorithms[kdfID];
 
 		status = encrypt.deriveKeyFromPassword(
 			pass.ToStdString(), 
@@ -669,7 +601,7 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 		kdfID = kdf_choice->GetSelection();
 
 		encrypt.crypto_flags.test(Crypto::HEADER) ?
-			selectedKdf = encrypt.kdf[kdfID] : selectedKdf = encrypt.kdf[--kdfID];
+			selectedKdf = getAlgo(kdfAlgorithms)[kdfID] : selectedKdf = kdfAlgorithms[kdfID];
 
 		status = encrypt.deriveKeyFromPassword(
 			pass.ToStdString(), 
@@ -690,16 +622,19 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 
 	if (cipher_choice->GetStringSelection() == "Auto") {
 
-		cipherID = rng.next_byte() % 4;
+		int lower_bound = 1;
+		int upper_bound = cipherAlgorithms.size() - 1;
 
-		selectedCipher = encrypt.algorithms[cipherID];
+		cipherID = lower_bound + (rng.next_byte() % (upper_bound - lower_bound + 1));
+
+		selectedCipher = cipherAlgorithms[cipherID];
 	}
 	else {
 
 		cipherID = cipher_choice->GetSelection();
 
 		encrypt.crypto_flags.test(Crypto::HEADER) ?
-			selectedCipher = encrypt.algorithms[cipherID] : selectedCipher = encrypt.algorithms[--cipherID];
+			selectedCipher = getAlgo(cipherAlgorithms)[cipherID] : selectedCipher = cipherAlgorithms[cipherID];
 	}
 
 	encrypt.header = encrypt.createEncryptFileHeader(
@@ -754,11 +689,9 @@ void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 
 void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 {
-	std::vector<std::string> kdf = { "Argon2id", "Scrypt" };
-	std::vector<std::string> algorithms = { "AES-256/GCM(16)", "Serpent/GCM(16)", "Twofish/GCM(16)", "Camellia-256/GCM(16)" };
 
 	size_t status = 0;
-	CryptoManager decrypt(kdf, algorithms);
+	CryptoManager decrypt;
 	wxString output;
 	float progress;
 
@@ -802,15 +735,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 
 			decrypt.kdf_params.kdf_strength = decrypt.header.kdfStrength;
 
-			selectedKdf =
-				(decrypt.header.kdfAlgorithmID == 0) ? "Argon2id" :
-				(decrypt.header.kdfAlgorithmID == 1) ? "Scrypt" : "";
-
-			selectedCipher =
-				(decrypt.header.encryptionAlgorithmID == 0) ? "AES-256/GCM(16)" :
-				(decrypt.header.encryptionAlgorithmID == 1) ? "Serpent/GCM(16)" :
-				(decrypt.header.encryptionAlgorithmID == 2) ? "Twofish/GCM(16)" :
-				(decrypt.header.encryptionAlgorithmID == 3) ? "Camellia-256/GCM(16)" : "";
+			selectedKdf = getAlgo(kdfAlgorithms)[decrypt.header.kdfAlgorithmID];
+			selectedCipher = getAlgo(cipherAlgorithms)[decrypt.header.encryptionAlgorithmID];
 
 			progress = (i + 1) * 100 / files.GetCount();
 			progress_crypt->SetValue(static_cast<int>(progress));
@@ -854,7 +780,8 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				output.ToStdString(), 
 				decrypt.key_params, 
 				selectedCipher, 
-				decrypt.crypto_flags, 
+				decrypt.crypto_flags,
+				getAlgo(cipherAlgorithms),
 				stop_flag
 			);
 		}
@@ -871,17 +798,17 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 				decrypt.crypto_flags.set(Crypto::DECRYPT);
 			}
 
-			for (size_t x = 0; x < 3; x++) {
+			for (size_t kdf_strength_id = 0; kdf_strength_id <= (kdf_slider->GetMax() - kdf_slider->GetMin()); kdf_strength_id++) {
 
 				if (stop_flag) { continue; }
 
-				decrypt.kdf_params.kdf_strength = x;
+				decrypt.kdf_params.kdf_strength = kdf_strength_id;
 
-				for (size_t x = 0; x < decrypt.kdf.size(); x++)
+				for (size_t kdf_algo_id = 0; kdf_algo_id < 2; kdf_algo_id++)
 				{
 					if (stop_flag) { continue; }
 
-					selectedKdf = decrypt.kdf[x];
+					selectedKdf = getAlgo(kdfAlgorithms)[kdf_algo_id];
 
 					status = decrypt.deriveKeyFromPassword(
 						pass.ToStdString(),
@@ -922,6 +849,7 @@ void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 						decrypt.key_params,
 						selectedCipher,
 						decrypt.crypto_flags,
+						getAlgo(cipherAlgorithms),
 						stop_flag
 					);
 

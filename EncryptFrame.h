@@ -12,6 +12,7 @@
 
 #include <filesystem>
 #include <bitset>
+#include <map>
 
 #define VERSION 1
 
@@ -43,6 +44,7 @@ class EncryptFrame : public wxFrame
     wxString outputPathCryptFile;
 
     wxString fullPathHashFile;
+    wxStaticText* pathHashFile;
 
     wxTextCtrl* sha3Text;
     wxTextCtrl* sha512Text;
@@ -94,8 +96,28 @@ class EncryptFrame : public wxFrame
 
     void OnEnterPass(wxCommandEvent& event);
 
-    void OnKdfChoice(wxCommandEvent& event);
-    void OnCipherChoice(wxCommandEvent& event);
+    std::vector<std::pair<std::string, size_t>> hashAlgorithms = {
+    {"SHA-3(512)", 512},
+    {"SHA-512", 512},
+    {"SHA-256", 256},
+    {"Skein-512(512)", 512},
+    {"BLAKE2b(512)", 512},
+    {"BLAKE2s(256)", 256}
+    };
+
+    std::map<int, std::string> kdfAlgorithms = {
+        {0, "Auto"},
+        {1, "Argon2id"},
+        {2, "Scrypt"}
+    };
+
+    std::map<int, std::string> cipherAlgorithms = {
+        {0, "Auto"},
+        {1, "AES-256/GCM(16)"},
+        {2, "Serpent/GCM(16)"},
+        {3, "Twofish/GCM(16)"},
+        {4, "Camellia-256/GCM(16)"}
+    };
 
 public:
 
@@ -140,6 +162,26 @@ public:
 
     void OnRadioFileSelected(wxCommandEvent& event);
     void OnRadioTextSelected(wxCommandEvent& event);
+
+    std::vector<std::string> getAlgo(const std::map<int, std::string>& cipherAlgorithms) {
+        std::vector<std::string> algorithms;
+
+        auto it = cipherAlgorithms.begin();
+        if (it != cipherAlgorithms.end()) {
+            ++it;
+        }
+
+        for (; it != cipherAlgorithms.end(); ++it) {
+            algorithms.push_back(it->second);
+        }
+
+        return algorithms;
+    }
+
+    std::vector<wxTextCtrl*> getTextHashes() {
+        return { sha3Text, sha512Text, sha256Text, skeinText, blake2bText, blake2sText };
+    }
+
 
     EncryptFrame() = default;
     ~EncryptFrame() = default;

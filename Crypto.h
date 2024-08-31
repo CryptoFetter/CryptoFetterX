@@ -1,6 +1,10 @@
 #ifndef CRYPTO_H
 #define CRYPTO_H
 
+#include <botan/x509self.h>
+#include <botan/frodokem.h>
+#include <botan/kyber.h>
+#include <botan/pubkey.h>
 #include <botan/secmem.h>
 #include <botan/auto_rng.h>
 #include <botan/cipher_mode.h>
@@ -58,9 +62,6 @@ public:
 
     std::bitset<7> crypto_flags;
 
-    std::vector<std::string> kdf;
-    std::vector<std::string> algorithms;
-
     struct KdfParameters {
         size_t kdf_strength;
         size_t memory;
@@ -112,6 +113,7 @@ public:
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
         const std::bitset<7>& flag,
+        std::vector<std::string> algorithms,
         bool& stop
     );
 
@@ -141,10 +143,6 @@ public:
     );
 
     double calculateEntropy(const std::string& password);
-
-    CryptoManager(const std::vector<std::string>& kdfInit, const std::vector<std::string>& algorithmsInit)
-        : kdf(kdfInit), algorithms(algorithmsInit) {
-    }
 
     CryptoManager() = default;
     ~CryptoManager() = default;

@@ -184,6 +184,7 @@ size_t CryptoManager::decryptFile(
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
 	const std::bitset<7>& flag,
+	std::vector<std::string> algorithms,
 	bool& stop
 ) {
 	std::vector<uint8_t> buffer;
@@ -266,13 +267,11 @@ size_t CryptoManager::decryptFile(
 				}
 				catch (Botan::Invalid_State) {
 
-					std::vector<uint8_t>().swap(buffer);
 					out.close();
 					return Crypto::ERROR_DECRYPT;
 				}
 				catch (...) {
 
-					std::vector<uint8_t>().swap(buffer);
 					out.close();
 					return Crypto::ERROR_DECRYPT;
 				}
