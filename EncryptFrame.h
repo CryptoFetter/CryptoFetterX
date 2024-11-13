@@ -7,12 +7,18 @@
 #include <wx/listctrl.h>
 #include <wx/notebook.h>
 #include <wx/filesys.h>
+#include <wx/thread.h>
+#include <wx/xml/xml.h>
+#include <wx/xrc/xmlres.h>
+#include <wx/file.h>
 
 #include <botan/system_rng.h>
 
 #include <filesystem>
 #include <bitset>
 #include <map>
+
+#include "Local.h"
 
 #define VERSION 1
 
@@ -102,7 +108,7 @@ class EncryptFrame : public wxFrame
     {"SHA-256", 256},
     {"Skein-512(512)", 512},
     {"BLAKE2b(512)", 512},
-    {"BLAKE2s(256)", 256}
+    {"MD5", 128}
     };
 
     std::map<int, std::string> kdfAlgorithms = {
@@ -113,11 +119,13 @@ class EncryptFrame : public wxFrame
 
     std::map<int, std::string> cipherAlgorithms = {
         {0, "Auto"},
-        {1, "AES-256/GCM(16)"},
-        {2, "Serpent/GCM(16)"},
-        {3, "Twofish/GCM(16)"},
-        {4, "Camellia-256/GCM(16)"}
+        {1, "AES-256/GCM"},
+        {2, "Serpent/GCM"},
+        {3, "Twofish/GCM"},
+        {4, "Camellia-256/GCM"}
     };
+
+    LocalizationManager localizationManager;
 
 public:
 
@@ -132,6 +140,9 @@ public:
     void OnEncryptFile(wxCommandEvent& event);
 
     void OnDecryptFile(wxCommandEvent& event);
+
+    void FileDecryptor();
+    void FileEncryptor();
 
     void OnHidePassBox(wxCommandEvent& event);
 
@@ -181,7 +192,6 @@ public:
     std::vector<wxTextCtrl*> getTextHashes() {
         return { sha3Text, sha512Text, sha256Text, skeinText, blake2bText, blake2sText };
     }
-
 
     EncryptFrame() = default;
     ~EncryptFrame() = default;

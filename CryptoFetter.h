@@ -8,7 +8,7 @@ class Fetter:public wxApp
 {
 
 public:
-	bool OnInit();
+	virtual bool OnInit();
 
 };
 

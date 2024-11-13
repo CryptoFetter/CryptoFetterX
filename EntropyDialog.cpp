@@ -1,12 +1,18 @@
 ﻿#include "EntropyDialog.h"
 #include "Crypto.h"
 
+
 EntropyDialog::EntropyDialog(wxWindow* parent, wxWindowID id, const wxString& title)
     : wxDialog(parent, id, title, wxDefaultPosition, wxSize(815, 550), wxDEFAULT_DIALOG_STYLE & ~wxCLOSE_BOX)
 {
+    if (!localizationManager.LoadLanguage("en.xml"))
+    {
+        wxLogError("Failed to load localization.");
+    }
+
     wxPanel* entropyCollector = new wxPanel(this);
 
-    wxStaticText* staticText = new wxStaticText(entropyCollector, wxID_ANY, "Move the mouse pointer randomly in this window", 
+    wxStaticText* staticText = new wxStaticText(entropyCollector, wxID_ANY, localizationManager.GetTranslation("TEXT_ENTROPY"),
         wxPoint(5, 5), wxSize(805, 32), wxALIGN_CENTRE | wxST_ELLIPSIZE_START);
 
     wxFont font(16, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);

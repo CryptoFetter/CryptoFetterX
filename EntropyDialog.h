@@ -3,6 +3,7 @@
 
 #include <wx/wx.h>
 #include "Crypto.h"
+#include "Local.h"
 
 class EntropyDialog : public wxDialog
 {
@@ -11,6 +12,8 @@ class EntropyDialog : public wxDialog
     wxGauge* progress_entropy;
 
     void OnMouseEvent(wxMouseEvent& evt);
+
+    LocalizationManager localizationManager;
 
 public:
     EntropyDialog(wxWindow* parent, wxWindowID id, const wxString& title);

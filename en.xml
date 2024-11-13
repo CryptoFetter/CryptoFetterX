@@ -1,0 +1,43 @@
+<locale>
+    <entry id="BUTTON_ENCRYPT">Encrypt</entry>
+    <entry id="BUTTON_DECRYPT">Decrypt</entry>
+    <entry id="BUTTON_SELECT_FILE">Select file</entry>
+    <entry id="BUTTON_OUTPUT_FOLDER">Output folder</entry>
+    <entry id="BUTTON_KEY_FILE">Keyfile</entry>
+    <entry id="BUTTON_OPEN_FILE">Open file</entry>
+
+    <entry id="PAGE_ENCRYPTION">File encryption</entry>
+    <entry id="PAGE_HASHER">Hasher</entry>
+
+    <entry id="S_BOX_ENTER_PASS">Enter password</entry>
+    <entry id="S_BOX_ENCRYPT_SETTINGS">Encrypt settings</entry>
+    <entry id="S_BOX_STATUS">Status</entry>
+    <entry id="S_BOX_HASH_FROM">Hash from:</entry>
+    <entry id="S_BOX_TEXT">Text:</entry>
+    <entry id="S_BOX_PATH">Path:</entry>
+
+    <entry id="RADIO_TEXT">Text</entry>
+    <entry id="RADIO_FILE">File</entry>
+
+    <entry id="TEXT_PASS_QUALITY">Password quality</entry>
+    <entry id="TEXT_CONFIRM_PASS">Confirm password</entry>
+    <entry id="TEXT_KDF_FUNC">Key derive function:</entry>
+    <entry id="TEXT_KDF_STRONG">Key derive strong:</entry>
+    <entry id="TEXT_CIPHER">Cipher:</entry>
+    <entry id="TEXT_BLAKE2S">Blake2s:</entry>
+    <entry id="TEXT_BLAKE2B">Blake2d:</entry>
+    <entry id="TEXT_SHA256">SHA256:</entry>
+    <entry id="TEXT_SHA512">SHA512:</entry>
+    <entry id="TEXT_SHA3">SHA3:</entry>
+    <entry id="TEXT_SKEIN">Skein:</entry>
+
+    <entry id="C_BOX_UNHIDE_PASS">Unhide password</entry>
+    <entry id="C_BOX_COMPRESS">Compress</entry>
+    <entry id="C_BOX_DELETE">Delete original</entry>
+    <entry id="C_BOX_KEYFILE">Keyfile</entry>
+    <entry id="C_BOX_HPRNG">Hard PRNG</entry>
+    <entry id="C_BOX_HEADER">Header enabled</entry>
+
+    <entry id="TOOLTIP_HEADER">Adding a header greatly speeds up the decryption speed, but significantly weakens the defense because the attacker becomes aware of the encryption algorithms used</entry>
+    <entry id="TOOLTIP_COMPRESS">You should always compress before you encrypt, because encryption seeks to hide the redundancy that compression is supposed to try to find and remove</entry>
+</locale>

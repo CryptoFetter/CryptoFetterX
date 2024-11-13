@@ -14,12 +14,25 @@
 #include <botan/pwdhash.h>
 #include <botan/system_rng.h>
 #include <botan/compression.h>
+#include <botan/aead.h>
 
 #include <include/bzlib.h>
 
 #include <bitset>
 #include <fstream>
 #include <vector>
+#include <cmath>
+#include <cctype>
+#include <string>
+#include <string>
+#include <locale>
+#include <codecvt>
+#include <unordered_set>
+#include <future>
+#include <atomic>
+
+#include <thread>
+#include <mutex>
 
 namespace Crypto {
 
@@ -45,17 +58,14 @@ namespace Crypto {
 
 class CryptoManager {
 
-    static const int IV_SIZE = 16;
-    static const int KEY_SIZE = 32;
-    static const int SALT_SIZE = 64;
-    static const int HEADER_SIZE = 105;
-
     struct EncryptFetterHeader {
         Botan::secure_vector<uint8_t> salt;
         Botan::secure_vector<uint8_t> iv;
     };
 
 public:
+
+    std::unique_ptr<Botan::AEAD_Mode> cipher_mode;
 
     std::string cipherAlgo;
     bool compressFlag;
@@ -113,14 +123,33 @@ public:
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
         const std::bitset<7>& flag,
-        std::vector<std::string> algorithms,
-        bool& stop
+        const std::vector<std::string>& algorithms,
+        std::atomic<bool> &stop,
+        const OptionalFetterHeader* header = nullptr
     );
 
     bool getKeyParameters(
         const std::string& inputFilename,
         KeyParameters& keyparams,
         OptionalFetterHeader* header = nullptr
+    );
+
+    std::unique_ptr<Botan::AEAD_Mode> createCipher(
+        const std::string& cipher, 
+        const std::string& mode, 
+        const Botan::SymmetricKey& key, 
+        const Botan::InitializationVector& iv,
+        const OptionalFetterHeader* header = nullptr
+    );
+
+    Botan::secure_vector<uint8_t>* compressData(
+        const Botan::secure_vector<uint8_t>& input, 
+        const std::string& compression_algorithm
+    );
+
+    Botan::secure_vector<uint8_t>* decompressData(
+        const Botan::secure_vector<uint8_t>& input, 
+        const std::string& compression_algorithm
     );
 
     OptionalFetterHeader createEncryptFileHeader(
@@ -133,16 +162,23 @@ public:
     );
 
     Botan::secure_vector<uint8_t> getHashFile(
-        std::string file_path,
-        std::string algo
+        const std::string &file_path,
+        const std::string &algo
     );
 
     Botan::secure_vector<uint8_t> getHashData(
-        Botan::secure_vector<uint8_t> data,
-        std::string algo
+        const Botan::secure_vector<uint8_t> &data,
+        const std::string &algo
     );
 
-    double calculateEntropy(const std::string& password);
+    double calculateEntropy(const std::wstring& password);
+
+    static const int IV_SIZE = 16;
+    static const int KEY_SIZE = 32;
+    static const int SALT_SIZE = 64;
+    static const int HEADER_SIZE = sizeof(OptionalFetterHeader);
+
+    static const int COMPRESS_LEVEL = 9;
 
     CryptoManager() = default;
     ~CryptoManager() = default;
