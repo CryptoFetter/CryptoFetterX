@@ -1,82 +1,82 @@
 ﻿#include "EntropyDialog.h"
+#include "Secure.h"
 
 std::unique_ptr<Botan::AEAD_Mode> CryptoManager::createCipher(
-	const std::string& cipher, 
-	const std::string& mode, 
-	const Botan::SymmetricKey& key, 
+	const std::string& cipher,
+	std::string_view mode,
+	const Botan::SymmetricKey& key,
 	const Botan::InitializationVector& iv,
 	const OptionalFetterHeader* header
 ) {
-	auto operation = (mode == "Encrypt") ? Botan::Cipher_Dir::Encryption :
-		(mode == "Decrypt") ? Botan::Cipher_Dir::Decryption :
-		throw std::invalid_argument("Invalid mode: " + mode);
-
-	std::unique_ptr<Botan::AEAD_Mode> cipher_mode;
+	Botan::Cipher_Dir operation;
+	if (mode == "Encrypt") {
+		operation = Botan::Cipher_Dir::Encryption;
+	}
+	else if (mode == "Decrypt") {
+		operation = Botan::Cipher_Dir::Decryption;
+	}
+	else {
+		throw std::invalid_argument("Invalid mode: " + std::string(mode));
+	}
 
 	try {
+		auto cipher_mode = Botan::AEAD_Mode::create_or_throw(cipher, operation);
 
-	cipher_mode = Botan::AEAD_Mode::create_or_throw(cipher, operation);
+		cipher_mode->set_key(key);
 
-	cipher_mode->set_key(key);
+		if (header) {
+			std::vector<uint8_t> aad(reinterpret_cast<const uint8_t*>(header),
+				reinterpret_cast<const uint8_t*>(header) + HEADER_SIZE);
+			cipher_mode->set_associated_data(aad);
+		}
 
-	if (header != nullptr) {
-		std::vector<uint8_t> aad(sizeof(OptionalFetterHeader));
+		cipher_mode->start(iv);
 
-		std::memcpy(aad.data(), reinterpret_cast<const uint8_t*>(header), sizeof(OptionalFetterHeader));
-
-		cipher_mode->set_associated_data(aad);
+		return cipher_mode;
 	}
-	
-	cipher_mode->start(iv);
-
+	catch (const Botan::Exception& e) {
+		throw std::runtime_error("Botan error during cipher creation: " + std::string(e.what()));
+	}
+	catch (const std::exception& e) {
+		throw std::runtime_error("Standard error during cipher creation: " + std::string(e.what()));
 	}
 	catch (...) {
-
-		throw std::runtime_error("Failed to create cipher mode");
-		return nullptr;
+		throw std::runtime_error("Unknown error occurred during cipher creation");
 	}
-
-	return cipher_mode;
 }
 
-Botan::secure_vector<uint8_t>* CryptoManager::compressData(
-	const Botan::secure_vector<uint8_t>& input, 
+std::unique_ptr<Botan::secure_vector<uint8_t>> CryptoManager::compressData(
+	const Botan::secure_vector<uint8_t>& input,
 	const std::string& compression_algorithm
-)
-{
-	std::unique_ptr<Botan::Compression_Algorithm> compressor(Botan::Compression_Algorithm::create(compression_algorithm));
+) {
+	auto compressor = Botan::Compression_Algorithm::create(compression_algorithm);
 	if (!compressor) {
-		throw std::runtime_error("Invalid decompression algorithm: " + compression_algorithm);
+		throw std::runtime_error("Invalid compression algorithm: " + compression_algorithm);
 	}
 
 	compressor->start(COMPRESS_LEVEL);
 
-	auto output = new Botan::secure_vector<uint8_t>();
+	auto output = std::make_unique<Botan::secure_vector<uint8_t>>(input);
 
-	Botan::secure_vector<uint8_t> temp_buf = input;
-	compressor->finish(temp_buf, 0);
-	output->insert(output->end(), temp_buf.begin(), temp_buf.end());
+	compressor->finish(*output, 0);
 
 	return output;
 }
 
-Botan::secure_vector<uint8_t>* CryptoManager::decompressData(
-	const Botan::secure_vector<uint8_t>& input, 
+std::unique_ptr<Botan::secure_vector<uint8_t>> CryptoManager::decompressData(
+	const Botan::secure_vector<uint8_t>& input,
 	const std::string& compression_algorithm
-)
-{
-	std::unique_ptr<Botan::Decompression_Algorithm> decompressor(Botan::Decompression_Algorithm::create(compression_algorithm));
+) {
+	auto decompressor = Botan::Decompression_Algorithm::create(compression_algorithm);
 	if (!decompressor) {
 		throw std::runtime_error("Invalid decompression algorithm: " + compression_algorithm);
 	}
 
 	decompressor->start();
 
-	auto output = new Botan::secure_vector<uint8_t>();
+	auto output = std::make_unique<Botan::secure_vector<uint8_t>>(input);
 
-	Botan::secure_vector<uint8_t> temp_buf = input;
-	decompressor->finish(temp_buf, 0);
-	output->insert(output->end(), temp_buf.begin(), temp_buf.end());
+	decompressor->finish(*output, 0);
 
 	return output;
 }
@@ -87,22 +87,23 @@ Botan::secure_vector<uint8_t> CryptoManager::getHashFile(
 )
 {
 	try {
-		std::vector<uint8_t> buffer;
-
-		std::ifstream keyfile(file_path, std::ios::in | std::ios::binary);
-		if (!keyfile.is_open()) {
+		std::ifstream file(file_path, std::ios::binary);
+		if (!file) {
 			throw std::runtime_error("Failed to open file: " + file_path);
 		}
 
-		std::copy(std::istreambuf_iterator<char>(keyfile), std::istreambuf_iterator<char>(), std::back_inserter(buffer));
-		keyfile.close();
+		auto hash_fn = Botan::HashFunction::create_or_throw(algo);
 
-		if (buffer.empty()) { throw std::exception(); }
+		Botan::secure_vector<uint8_t> buffer(4096);
+		while (file.read(reinterpret_cast<char*>(buffer.data()), buffer.size()) || file.gcount() > 0) {
+			hash_fn->update(buffer.data(), file.gcount());
+		}
 
-		return Botan::HashFunction::create_or_throw(algo)->process(buffer.data(), buffer.size());
+		return hash_fn->final();
 	}
-	catch (...) {
-		return Botan::secure_vector<uint8_t>();
+	catch (const std::exception& e) {
+		std::cerr << "Error in getHashFile: " << e.what() << std::endl;
+		return {};
 	}
 }
 
@@ -112,10 +113,14 @@ Botan::secure_vector<uint8_t> CryptoManager::getHashData(
 )
 {
 	try {
-		return Botan::HashFunction::create(algo)->process(data.data(), data.size());
+		auto hash_fn = Botan::HashFunction::create_or_throw(algo);
+
+		hash_fn->update(data);
+		return hash_fn->final();
 	}
-	catch (...) {
-		return Botan::secure_vector<uint8_t>();
+	catch (const std::exception& e) {
+		std::cerr << "Error in getHashData: " << e.what() << std::endl;
+		return {};
 	}
 }
 
@@ -204,76 +209,68 @@ size_t CryptoManager::encryptFile(
 	const std::string& selectedCipher,
 	const std::bitset<7>& flag,
 	const OptionalFetterHeader* header
-)
-{
-	std::ifstream in(inputFilename, std::ios::in | std::ios::binary);
-	if (!in.is_open()) {
+) {
+	std::ifstream in(inputFilename, std::ios::binary);
+	if (!in) {
+		std::cerr << "Failed to open input file: " << inputFilename << std::endl;
 		return Crypto::ERROR_OPEN_FILE;
 	}
 
-	std::ofstream out(outputFilename, std::ios::noreplace | std::ios::out | std::ios::binary);
-	if (!out.is_open()) {
-		in.close();
+	std::ofstream out(outputFilename, std::ios::binary | std::ios::noreplace);
+	if (!out) {
+		std::cerr << "Failed to open output file: " << outputFilename << std::endl;
 		return Crypto::ERROR_OPEN_FILE;
 	}
 
-	Botan::secure_vector<uint8_t> buffer;
-	Botan::secure_vector<uint8_t> output_data;
+	Botan::secure_vector<uint8_t> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	if (buffer.empty()) {
+		std::cerr << "Input file is empty or could not be read." << std::endl;
+		return Crypto::ERROR_OPEN_FILE;
+	}
 
 	try {
-
 		Botan::AutoSeeded_RNG rng;
-
 		Botan::SymmetricKey key(keyparams.key.data(), keyparams.key.size());
-
 		Botan::InitializationVector iv(rng, IV_SIZE);
 		Botan::secure_vector<uint8_t> iv_bits = iv.bits_of();
+		std::unique_ptr<Botan::AEAD_Mode> cryptor = createCipher(selectedCipher, "Encrypt", key, iv, (flag.test(Crypto::HEADER) && header) ? header : nullptr);
 
-		std::unique_ptr<Botan::AEAD_Mode> cryptor;
-
-		std::copy(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>(), std::back_inserter(buffer));
-
-		if (flag.test(Crypto::HEADER) && header != nullptr)
-		{
+		if (flag.test(Crypto::HEADER) && header) {
 			out.write(reinterpret_cast<const char*>(header), sizeof(OptionalFetterHeader));
 		}
 
+		out.write(reinterpret_cast<const char*>(iv_bits.data()), iv_bits.size());
 		if (flag.test(Crypto::KEYFILE)) {
-			// When a key file is used, salt is taken from it. But a random salt is still written to the encrypted file, which is not suitable for decrypting data
-			Botan::secure_vector<uint8_t> salt = Botan::secure_vector<uint8_t>(SALT_SIZE);
-			rng.randomize_with_ts_input(&salt[0], SALT_SIZE);
-
-			out.write(reinterpret_cast<const char*>(iv_bits.data()), iv_bits.size());
+			Botan::secure_vector<uint8_t> salt(SALT_SIZE);
+			rng.randomize_with_ts_input(salt.data(), SALT_SIZE);
 			out.write(reinterpret_cast<const char*>(salt.data()), salt.size());
 		}
 		else {
-			out.write(reinterpret_cast<const char*>(iv_bits.data()), iv_bits.size());
 			out.write(reinterpret_cast<const char*>(keyparams.salt.data()), keyparams.salt.size());
 		}
 
-		cryptor = createCipher(selectedCipher, "Encrypt", key, iv, flag.test(Crypto::HEADER) && header ? header : nullptr);
+		Botan::secure_vector<uint8_t> output_data = flag.test(Crypto::COMPRESS)
+			? *compressData(buffer, "bzip2")
+			: std::move(buffer);
 
-		if (flag.test(Crypto::COMPRESS)) {
-			output_data = *compressData(buffer, "bzip2");
-			cryptor->finish(output_data, 0);
-			out.write(reinterpret_cast<const char*>(output_data.data()), output_data.size());
-		}
-		else {
-			cryptor->finish(buffer, 0);
-			out.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-		}
+		cryptor->finish(output_data, 0);
+		out.write(reinterpret_cast<const char*>(output_data.data()), output_data.size());
 
-		in.close();
-		out.close();
+		erase_mem(const_cast<uint8_t*>(keyparams.key.data()), keyparams.key.size());
 		return Crypto::ERROR_OK;
 	}
-	catch (...)
-	{
-		in.close();
-		out.close();
-
-		return Crypto::ERROR_ENCRYPT;
+	catch (const Botan::Exception& e) {
+		std::cerr << "Encryption error: " << e.what() << std::endl;
 	}
+	catch (const std::exception& e) {
+		std::cerr << "Standard exception: " << e.what() << std::endl;
+	}
+	catch (...) {
+		std::cerr << "Unknown error occurred during encryption" << std::endl;
+	}
+
+	erase_mem(const_cast<uint8_t*>(keyparams.key.data()), keyparams.key.size());
+	return Crypto::ERROR_ENCRYPT;
 }
 
 size_t CryptoManager::decryptFile(
@@ -336,7 +333,7 @@ size_t CryptoManager::decryptFile(
 		for (const auto& algorithm : algorithms) {
 			if (stop) break;
 
-			futures.push_back(std::async(std::launch::async, [&, algorithm]() {
+			futures.emplace_back(std::async(std::launch::async, [&, algorithm]() {
 				Botan::secure_vector<uint8_t> temp_buffer = buffer;
 				Botan::secure_vector<uint8_t> output_data;
 
@@ -410,24 +407,24 @@ bool CryptoManager::getKeyParameters(
 
 	in.seekg(0, std::ios::beg);
 
-	bool result = (byte7 == 0x07 && byte8 == 0x07 && byte9 == 0x07);
+	bool result = (
+		byte7 == 0x07 && 
+		byte8 == 0x07 && 
+		byte9 == 0x07);
 
 	if (result) {
 		if (!in.read(reinterpret_cast<char*>(header), sizeof(OptionalFetterHeader))) {
-			in.close();
 			return false;
 		}
 	}
 
-	if (!in.read(reinterpret_cast<char*>(iv.data()), IV_SIZE) || !in.read(reinterpret_cast<char*>(salt.data()), SALT_SIZE)) {
-		in.close();
+	if (!in.read(reinterpret_cast<char*>(iv.data()), IV_SIZE) || 
+		!in.read(reinterpret_cast<char*>(salt.data()), SALT_SIZE)) {
 		return false;
 	}
 
 	keyparams.iv = std::move(iv);
 	keyparams.salt = std::move(salt);
-
-	in.close();
 
 	return result;
 }

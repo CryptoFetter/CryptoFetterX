@@ -136,18 +136,18 @@ public:
 
     std::unique_ptr<Botan::AEAD_Mode> createCipher(
         const std::string& cipher, 
-        const std::string& mode, 
+        std::string_view mode,
         const Botan::SymmetricKey& key, 
         const Botan::InitializationVector& iv,
         const OptionalFetterHeader* header = nullptr
     );
 
-    Botan::secure_vector<uint8_t>* compressData(
+    std::unique_ptr<Botan::secure_vector<uint8_t>> compressData(
         const Botan::secure_vector<uint8_t>& input, 
         const std::string& compression_algorithm
     );
 
-    Botan::secure_vector<uint8_t>* decompressData(
+    std::unique_ptr<Botan::secure_vector<uint8_t>> decompressData(
         const Botan::secure_vector<uint8_t>& input, 
         const std::string& compression_algorithm
     );
