@@ -25,7 +25,7 @@
     <entry id="TEXT_KDF_FUNC">Key derive function:</entry>
     <entry id="TEXT_KDF_STRONG">Key derive strong:</entry>
     <entry id="TEXT_CIPHER">Cipher:</entry>
-    <entry id="TEXT_BLAKE2S">Blake2s:</entry>
+    <entry id="TEXT_MD5">MD5:</entry>
     <entry id="TEXT_BLAKE2B">Blake2d:</entry>
     <entry id="TEXT_SHA256">SHA256:</entry>
     <entry id="TEXT_SHA512">SHA512:</entry>
@@ -33,14 +33,14 @@
     <entry id="TEXT_SKEIN">Skein:</entry>
 
     <entry id="TEXT_HASH_GEN_ERROR">Error: Unable to generate hash</entry>
-    <entry id="TEXT_SKEIN">Skein:</entry>
-    <entry id="TEXT_SKEIN">Skein:</entry>
+    <entry id="TEXT_ENTROPY">Move your mouse randomly within this window to collect entropy. The window will close automatically</entry>
+
 
     <entry id="C_BOX_UNHIDE_PASS">Unhide password</entry>
     <entry id="C_BOX_COMPRESS">Compress</entry>
     <entry id="C_BOX_DELETE">Delete original</entry>
     <entry id="C_BOX_KEYFILE">Keyfile</entry>
-    <entry id="C_BOX_HPRNG">Hard PRNG</entry>
+    <entry id="C_BOX_HPRNG">Mouse PRNG</entry>
     <entry id="C_BOX_HEADER">Header enabled</entry>
 
     <entry id="C_MBOX_FILE">File</entry>
@@ -52,6 +52,7 @@
     <entry id="C_MBOX_DECRYPT">Decrypt</entry>
     <entry id="C_MBOX_DECRYPT_ERROR">Decryption error</entry>
     <entry id="C_MBOX_DECRYPT_PASS_ERROR">Enter the decryption password in the Password field</entry>
+    <entry id="C_MBOX_DECRYPT_FILE_EXIST">Decrypted file already exists. Do you want to overwrite it?</entry>
     <entry id="C_MBOX_PASSWORD">Password</entry>
     <entry id="C_MBOX_PASSWORD_EMPTY">One or both password fields are empty</entry>
     <entry id="C_MBOX_PASSWORD_MATCH">The entered passwords do not match</entry>
@@ -73,4 +74,8 @@
 
     <entry id="TOOLTIP_HEADER">Adding a header greatly speeds up the decryption speed, but significantly weakens the defense because the attacker becomes aware of the encryption algorithms used</entry>
     <entry id="TOOLTIP_COMPRESS">You should always compress before you encrypt, because encryption seeks to hide the redundancy that compression is supposed to try to find and remove</entry>
+    <entry id="TOOLTIP_USER_PRNG">In addition to the software PRNG, mouse movements are used as a source of random data</entry>
+    <entry id="TOOLTIP_PASS_LEN">Max 256 characters</entry>
+    <entry id="TOOLTIP_TEXT_LEN">Max 4096 characters</entry>
+    <entry id="TOOLTIP_CHOICE">Auto - algorithm is selected randomly</entry>
 </locale>

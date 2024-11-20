@@ -131,6 +131,8 @@ public:
 
     EncryptFrame(const wxString& title);
 
+    void EnableAllControls(bool enable);
+
     void OnOpenCryptFile(wxCommandEvent& event);
 
     void OnOpenKeyFile(wxCommandEvent& event);
@@ -169,7 +171,7 @@ public:
         Botan::secure_vector<uint8_t>& key
     );
 
-    wxString generateNewFileName(const wxString& originalFileName, size_t index);
+    wxString GenerateNewFileName(const wxString& originalFileName, size_t index);
 
     void OnRadioFileSelected(wxCommandEvent& event);
     void OnRadioTextSelected(wxCommandEvent& event);

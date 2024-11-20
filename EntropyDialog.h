@@ -4,6 +4,7 @@
 #include <wx/wx.h>
 #include "Crypto.h"
 #include "Local.h"
+#include "EncryptFrame.h"
 
 class EntropyDialog : public wxDialog
 {

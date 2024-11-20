@@ -5,6 +5,7 @@
 EntropyDialog::EntropyDialog(wxWindow* parent, wxWindowID id, const wxString& title)
     : wxDialog(parent, id, title, wxDefaultPosition, wxSize(815, 550), wxDEFAULT_DIALOG_STYLE & ~wxCLOSE_BOX)
 {
+    
     if (!localizationManager.LoadLanguage("en.xml"))
     {
         wxLogError("Failed to load localization.");
@@ -13,7 +14,7 @@ EntropyDialog::EntropyDialog(wxWindow* parent, wxWindowID id, const wxString& ti
     wxPanel* entropyCollector = new wxPanel(this);
 
     wxStaticText* staticText = new wxStaticText(entropyCollector, wxID_ANY, localizationManager.GetTranslation("TEXT_ENTROPY"),
-        wxPoint(5, 5), wxSize(805, 32), wxALIGN_CENTRE | wxST_ELLIPSIZE_START);
+        wxPoint(5, 5), wxSize(805, 64), wxALIGN_CENTRE | wxST_NO_AUTORESIZE);
 
     wxFont font(16, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL);
     staticText->SetFont(font);
@@ -34,7 +35,7 @@ void EntropyDialog::OnMouseEvent(wxMouseEvent& evt) {
         unsigned char x_byte = static_cast<unsigned char>(mousePos.x);
         unsigned char y_byte = static_cast<unsigned char>(mousePos.y);
 
-        wxMilliSleep(2);
+        wxMilliSleep(3);
 
         mouse_byte_sequence.push_back(x_byte);
         mouse_byte_sequence.push_back(y_byte);

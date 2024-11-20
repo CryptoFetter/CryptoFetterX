@@ -8,7 +8,6 @@ namespace fs = std::filesystem;
 
 EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, title)
 {
-
 	if (!localizationManager.LoadLanguage("en.xml"))
 	{
 		wxLogError("Failed to load localization.");
@@ -31,14 +30,17 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	passText = new wxTextCtrl(crypto, wxID_ANY, "", wxPoint(530, 60), wxSize(250, 25), wxTE_PASSWORD);
 	confPassText = new wxTextCtrl(crypto, wxID_ANY, "", wxPoint(530, 120), wxSize(250, 25), wxTE_PASSWORD);
 
+	passText->SetMaxLength(256);
+	passText->SetToolTip(localizationManager.GetTranslation("TOOLTIP_PASS_LEN"));
+
+	confPassText->SetMaxLength(256); 
+	confPassText->SetToolTip(localizationManager.GetTranslation("TOOLTIP_PASS_LEN"));
+
 	keyfileStaticText = new wxStaticText(crypto, wxID_ANY, "", wxPoint(610, 165), wxSize(170, 25), wxST_NO_AUTORESIZE);
 
 #ifdef _WIN32
 	hidePassCheckBox = new wxCheckBox(crypto, wxID_ANY, localizationManager.GetTranslation("C_BOX_UNHIDE_PASS"), wxPoint(530, 35));
 	hidePassCheckBox->Bind(wxEVT_CHECKBOX, &EncryptFrame::OnHidePassBox, this);
-#endif
-
-	key_file = new wxButton(crypto, wxID_ANY, localizationManager.GetTranslation("BUTTON_KEY_FILE"), wxPoint(530, 160), wxSize(70, 25));
 
 	hWndPassword = static_cast<HWND>(passText->GetHandle());
 	SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
@@ -47,7 +49,9 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	hWndConfirmPassword = static_cast<HWND>(confPassText->GetHandle());
 	SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
 	confPassText->Refresh();
+#endif
 
+	key_file = new wxButton(crypto, wxID_ANY, localizationManager.GetTranslation("BUTTON_KEY_FILE"), wxPoint(530, 160), wxSize(70, 25));
 
 	passText->Bind(wxEVT_TEXT, &EncryptFrame::OnEnterPass, this);
 	confPassText->Bind(wxEVT_TEXT, &EncryptFrame::OnEnterPass, this);
@@ -71,6 +75,7 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 
 	compress_flag->SetToolTip(new wxToolTip(localizationManager.GetTranslation("TOOLTIP_COMPRESS")));
 	header_flag->SetToolTip(new wxToolTip(localizationManager.GetTranslation("TOOLTIP_HEADER")));
+	hard_rng_flag->SetToolTip(new wxToolTip(localizationManager.GetTranslation("TOOLTIP_USER_PRNG")));
 
 	progress_pass = new wxGauge(crypto, wxID_ANY, 100, wxPoint(530, 225), wxSize(250, 15));
 
@@ -100,6 +105,7 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	}
 
 	cipher_choice = new wxChoice(crypto, wxID_ANY, wxPoint(655, 285), wxSize(125, 30), selectCipher);
+	cipher_choice->SetToolTip(localizationManager.GetTranslation("TOOLTIP_CHOICE"));
 	cipher_choice->Select(0);
 
 	wxArrayString selectKdf;
@@ -109,6 +115,7 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	}
 
 	kdf_choice = new wxChoice(crypto, wxID_ANY, wxPoint(655, 325), wxSize(125, 30), selectKdf);
+	kdf_choice->SetToolTip(localizationManager.GetTranslation("TOOLTIP_CHOICE"));
 	kdf_choice->Select(0);
 
 	kdf_slider = new wxSlider(crypto, wxID_ANY, 0, 0, 2, wxPoint(655, 365), wxSize(125, 30));
@@ -130,7 +137,7 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 
 	fileListToCrypt = new wxListCtrl(crypto, wxID_ANY, wxPoint(0, 15), wxSize(515, 130), wxLC_REPORT | wxLC_NO_HEADER);
 
-	fileListToCrypt->InsertColumn(0, wxGetTranslation("Name"), wxLIST_FORMAT_LEFT, 500);
+	fileListToCrypt->InsertColumn(0, wxGetTranslation("."), wxLIST_FORMAT_LEFT, 500);
 
 	outputFolderStaticText = new wxStaticText(crypto, wxID_ANY, "", wxPoint(260, 170), wxSize(250, 20), wxST_NO_AUTORESIZE);
 
@@ -166,6 +173,8 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 	sha256Text->SetEditable(false);
 
 	hashText = new wxTextCtrl(hasher, wxID_ANY, "", wxPoint(60, 260), wxSize(730, 80), wxTE_MULTILINE);
+	hashText->SetMaxLength(4096);
+	hashText->SetToolTip(localizationManager.GetTranslation("TOOLTIP_TEXT_LEN"));
 	hashText->Enable(false);
 
 	progress_hash = new wxGauge(hasher, wxID_ANY, 100, wxPoint(0, 455), wxSize(790, 25));
@@ -179,16 +188,22 @@ EncryptFrame::EncryptFrame(const wxString& title) :wxFrame(nullptr, wxID_ANY, ti
 
 void EncryptFrame::OnRadioTextSelected(wxCommandEvent& event)
 {
-	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
 	auto textHashes = getTextHashes();
+
+	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
 	if (radioButton)
 	{
 		hashText->Clear();
 		hashText->Enable(true);
+
 		open_hash_file->SetLabel(localizationManager.GetTranslation("BUTTON_HASH_TEXT"));
 		boolHashText = true;
 
-		for (size_t x = 0; x < textHashes.size(); ++x) textHashes[x]->Clear();
+		for (auto& textHash : textHashes) {
+			if (textHash) {
+				textHash->Clear();
+			}
+		}
 
 		pathHashFile->SetLabelText(localizationManager.GetTranslation("C_MBOX_PATH"));
 	}
@@ -196,9 +211,9 @@ void EncryptFrame::OnRadioTextSelected(wxCommandEvent& event)
 
 void EncryptFrame::OnRadioFileSelected(wxCommandEvent& event)
 {
-	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
 	auto textHashes = getTextHashes();
 
+	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
 	if (radioButton)
 	{
 
@@ -207,78 +222,78 @@ void EncryptFrame::OnRadioFileSelected(wxCommandEvent& event)
 		open_hash_file->SetLabel(localizationManager.GetTranslation("C_MBOX_OPEN_FILE"));
 		boolHashText = false;
 
-		for (size_t x = 0; x < textHashes.size(); ++x) textHashes[x]->Clear();
+		for (auto& textHash : textHashes) {
+			if (textHash) {
+				textHash->Clear();
+			}
+		}
 
 		pathHashFile->SetLabelText(localizationManager.GetTranslation("C_MBOX_PATH"));
 	}
 }
 
-void EncryptFrame::OnOpenHashFile(wxCommandEvent& event)
-{
+void EncryptFrame::OnOpenHashFile(wxCommandEvent& event) {
 	CryptoManager hasher;
-
 	auto textHashes = getTextHashes();
+	std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
 
 	if (boolHashText) {
+		wxString textForHash = hashText->GetValue();
+		if (textForHash.IsEmpty()) {
+			return;
+		}
 
-		wxString text_for_hash = hashText->GetValue();
-
-		std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
-
-		Botan::secure_vector<uint8_t> vec;
-
-		vec.resize(text_for_hash.size());
-		std::copy(text_for_hash.begin(), text_for_hash.end(), vec.begin());
+		Botan::secure_vector<uint8_t> vec(textForHash.begin(), textForHash.end());
 
 		for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
-			hashResults[i] = hasher.getHashData(vec, hashAlgorithms[i].first);
-			if (!hashResults[i].empty()) {
+			try {
+				hashResults[i] = hasher.getHashData(vec, hashAlgorithms[i].first);
 				textHashes[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
 			}
-			else {
+			catch (const std::exception&) {
 				textHashes[i]->SetLabelText(localizationManager.GetTranslation("TEXT_HASH_GEN_ERROR"));
 			}
 		}
 	}
 	else {
-	wxFileDialog openFileDialog(this, _(localizationManager.GetTranslation("C_MBOX_OPEN_KEYFILE")), "", "",
-		localizationManager.GetTranslation("C_MBOX_ALL_FILES"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+		wxFileDialog openFileDialog(
+			this,
+			localizationManager.GetTranslation("C_MBOX_OPEN_KEYFILE"),
+			"",
+			"",
+			localizationManager.GetTranslation("C_MBOX_ALL_FILES"),
+			wxFD_OPEN | wxFD_FILE_MUST_EXIST
+		);
 
-	if (openFileDialog.ShowModal() == wxID_CANCEL) { return; }
-
-	fullPathHashFile = openFileDialog.GetPath();
-
-	pathHashFile->SetLabelText(localizationManager.GetTranslation("C_MBOX_PATH") + fullPathHashFile);
-
-	std::vector<Botan::secure_vector<uint8_t>> hashResults(hashAlgorithms.size());
-
-	for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
-		hashResults[i] = hasher.getHashFile(fullPathHashFile.ToStdString(), hashAlgorithms[i].first);
-		if (!hashResults[i].empty()) {
-			textHashes[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
+		if (openFileDialog.ShowModal() == wxID_CANCEL) {
+			return;
 		}
-		else {
-			textHashes[i]->SetLabelText(localizationManager.GetTranslation("TEXT_HASH_GEN_ERROR"));
+
+		fullPathHashFile = openFileDialog.GetPath();
+		pathHashFile->SetLabelText(localizationManager.GetTranslation("C_MBOX_PATH") + fullPathHashFile);
+
+		for (size_t i = 0; i < hashAlgorithms.size(); ++i) {
+			try {
+				hashResults[i] = hasher.getHashFile(fullPathHashFile.ToStdString(), hashAlgorithms[i].first);
+				textHashes[i]->SetLabelText(Botan::hex_encode(hashResults[i].data(), hashResults[i].size()));
+			}
+			catch (const std::exception&) {
+				textHashes[i]->SetLabelText(localizationManager.GetTranslation("TEXT_HASH_GEN_ERROR"));
+			}
 		}
-	}
 	}
 }
 
 void EncryptFrame::OnHidePassBox(wxCommandEvent& event)
 {
 #ifdef _WIN32
-	if (hidePassCheckBox->GetValue())
-	{
-		SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, 0, 0);
-		SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, 0, 0);
+	bool hidePass = hidePassCheckBox->GetValue();
 
-		passText->Refresh();
-		confPassText->Refresh();
-	}
-	else
-	{
-		SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
-		SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, static_cast<WPARAM>('*'), 0);
+	WPARAM passwordChar = hidePass ? 0 : static_cast<WPARAM>('*');
+
+	if (hWndPassword && hWndConfirmPassword) {
+		SendMessageW(hWndPassword, EM_SETPASSWORDCHAR, passwordChar, 0);
+		SendMessageW(hWndConfirmPassword, EM_SETPASSWORDCHAR, passwordChar, 0);
 
 		passText->Refresh();
 		confPassText->Refresh();
@@ -288,9 +303,24 @@ void EncryptFrame::OnHidePassBox(wxCommandEvent& event)
 
 void EncryptFrame::OnEnterPass(wxCommandEvent& event)
 {
-	CryptoManager entropy;
+	wxString passValue = passText->GetValue();
 
-	progress_pass->SetValue(entropy.calculateEntropy(passText->GetValue().ToStdWstring()));
+	if (passValue.IsEmpty()) {
+		progress_pass->SetValue(0);
+		return;
+	}
+
+	std::wstring passWstr = passValue.ToStdWstring();
+
+	try {
+		CryptoManager entropy;
+		int entropyValue = entropy.calculateEntropy(passWstr);
+
+		progress_pass->SetValue(entropyValue);
+	}
+	catch (const std::exception) {
+		progress_pass->SetValue(0);
+	}
 }
 
 void EncryptFrame::OnOpenCryptFile(wxCommandEvent& event)
@@ -303,39 +333,27 @@ void EncryptFrame::OnOpenCryptFile(wxCommandEvent& event)
 	}
 
 	openFileDialog.GetPaths(files);
-
 	fileListToCrypt->DeleteAllItems();
 
 	const wxULongLong MAX_FILE_SIZE = wxULongLong(64) * 1024 * 1024 * 1024;
+	std::vector<wxString> filesList;
 
 	for (const auto& file : files)
 	{
 		wxFile selectedFile(file);
 
 		if (!selectedFile.IsOpened()) {
-			wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_UNABLE_OPEN_FILE")) + file, _(localizationManager.GetTranslation("C_MBOX_ERROR")), wxOK | wxICON_ERROR);
 			continue;
 		}
 
 		wxULongLong fileSize = selectedFile.Length();
 
 		if (fileSize > MAX_FILE_SIZE) {
-			wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_FILE_LIMIT")) + file, _(localizationManager.GetTranslation("C_MBOX_ERROR")), wxOK | wxICON_ERROR);
 			continue;
 		}
 
-		bool fileExists = false;
-		for (int i = 0; i < fileListToCrypt->GetItemCount(); i++)
-		{
-			if (file == fileListToCrypt->GetItemText(i))
-			{
-				fileExists = true;
-				break;
-			}
-		}
-
-		if (!fileExists)
-		{
+		if (std::find(filesList.begin(), filesList.end(), file) == filesList.end()) {
+			filesList.push_back(file);
 			fileListToCrypt->InsertItem(fileListToCrypt->GetItemCount(), file);
 		}
 	}
@@ -343,41 +361,42 @@ void EncryptFrame::OnOpenCryptFile(wxCommandEvent& event)
 
 void EncryptFrame::OnSaveOutputFolder(wxCommandEvent& event)
 {
-	wxDirDialog saveDirDialog(this, _(localizationManager.GetTranslation("DIALOG_SELECT_OUT_FILE")), "", wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+	wxDirDialog saveDirDialog(this, _(localizationManager.GetTranslation("DIALOG_SELECT_OUT_FILE")), "",
+		wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
 
 	if (saveDirDialog.ShowModal() == wxID_OK)
 	{
 		selectedSaveDir = saveDirDialog.GetPath();
 	}
 
-	if (selectedSaveDir.length() > 45)
-	{
-		int halfLength = 21;
-
-		outputFolderStaticText->SetLabelText(selectedSaveDir.Left(halfLength) + "..." + selectedSaveDir.Right(halfLength));
-	}
-	else {
-		outputFolderStaticText->SetLabelText(selectedSaveDir);
+	if (!selectedSaveDir.IsEmpty()) {
+		if (selectedSaveDir.length() > 45)
+		{
+			int halfLength = 21;
+			outputFolderStaticText->SetLabelText(selectedSaveDir.Left(halfLength) + "..." + selectedSaveDir.Right(halfLength));
+		}
+		else {
+			outputFolderStaticText->SetLabelText(selectedSaveDir);
+		}
 	}
 }
 
-wxString EncryptFrame::generateNewFileName(const wxString& originalFileName, size_t index)
+wxString EncryptFrame::GenerateNewFileName(const wxString& originalFileName, size_t index)
 {
 	wxFileName filePath(originalFileName);
-	filePath.GetPath();
+	filePath.Normalize(wxPATH_NORM_ALL);
 
 	wxString pathOnly;
-
-	if (!selectedSaveDir.IsEmpty())
-	{
+	if (!selectedSaveDir.IsEmpty() && wxDirExists(selectedSaveDir)) {
 		pathOnly = selectedSaveDir;
 	}
-	else
-	{
+	else {
 		pathOnly = filePath.GetPath(wxPATH_GET_SEPARATOR);
 	}
 
-	return pathOnly + wxFileName::GetPathSeparator(wxPATH_NATIVE) + wxString::Format("%zd_%s", index + 1, filePath.GetFullName());
+	wxString newFileName = wxString::Format("%zd_%s", index + 1, filePath.GetFullName());
+
+	return pathOnly + wxFileName::GetPathSeparator(wxPATH_NATIVE) + newFileName;
 }
 
 void EncryptFrame::OnOpenKeyFile(wxCommandEvent& event)
@@ -385,10 +404,13 @@ void EncryptFrame::OnOpenKeyFile(wxCommandEvent& event)
 	wxFileDialog openFileDialog(this, _(localizationManager.GetTranslation("C_MBOX_OPEN_KEY_FILE")), "", "",
 		localizationManager.GetTranslation("C_MBOX_ALL_FILES"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
-	if (openFileDialog.ShowModal() == wxID_CANCEL) { return; }
+	if (openFileDialog.ShowModal() == wxID_CANCEL) {
+		return;
+	}
+
+	fullPathKeyFile = openFileDialog.GetPath();
 
 	wxFileName fileInfo(fullPathKeyFile);
-
 	if (!fileInfo.IsFileReadable() || fileInfo.GetSize() == 0)
 	{
 		wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_EMPTY_FILE")),
@@ -396,12 +418,9 @@ void EncryptFrame::OnOpenKeyFile(wxCommandEvent& event)
 		return;
 	}
 
-	fullPathKeyFile = openFileDialog.GetPath();
-
 	if (fullPathKeyFile.length() > 30)
 	{
 		int halfLength = 13;
-
 		fullPathKeyFile = fullPathKeyFile.Left(halfLength) + "..." + fullPathKeyFile.Right(halfLength);
 	}
 
@@ -419,6 +438,7 @@ void EncryptFrame::OnKeyfileBoxChanged(wxCommandEvent& event)
 	{
 		key_file->Enable(false);
 		keyfileStaticText->Enable(false);
+		keyfileStaticText->SetLabelText("");
 	}
 }
 
@@ -492,6 +512,7 @@ void EncryptFrame::UpdateStatus(
 	textCompress->SetLabelText(wxString::Format("Compress: %s", compress ? "Yes" : "No"));
 	textKeyfile->SetLabelText(wxString::Format("KeyFile: %s", keyfile ? "Yes" : "No"));
 
+#ifdef _DEBUG
 	textIV->SetLabelText(wxString::Format("IV: %s", Botan::hex_encode(iv.data(), iv.size())));
 
 	wxString saltString = Botan::hex_encode(salt.data(), salt.size());
@@ -503,13 +524,21 @@ void EncryptFrame::UpdateStatus(
 
 	textSalt->SetLabelText(wxString::Format("Salt: %s", saltString));
 	textKey->SetLabelText(wxString::Format("Key: %s", keyString));
+#endif
 }
 
 void EncryptFrame::OnEncryptFile(wxCommandEvent& event)
 {
+	wxBusyCursor busyCursor;
+	EnableAllControls(false);
+
 	std::thread encrypt([this]() {
 
 		FileEncryptor();
+
+		wxTheApp->CallAfter([this]() {
+			EnableAllControls(true);
+			});
 
 		}); encrypt.detach();
 }
@@ -672,7 +701,7 @@ void EncryptFrame::FileEncryptor()
 
 	for (size_t i = 0; i < files.GetCount(); i++)
 	{
-		output = generateNewFileName(files[i], i);
+		output = GenerateNewFileName(files[i], i);
 
 		wxFileName filePath1(output.ToStdString());
 
@@ -705,7 +734,7 @@ void EncryptFrame::FileEncryptor()
 			encrypt.key_params.key
 		);
 
-		encrypt.encryptFile(
+		size_t status = encrypt.encryptFile(
 			files[i].ToStdString(), 
 			output.ToStdString(), 
 			encrypt.key_params, 
@@ -713,6 +742,23 @@ void EncryptFrame::FileEncryptor()
 			encrypt.crypto_flags, 
 			&encrypt.header
 		);
+
+		switch (status) {
+		case Crypto::ERROR_ENCRYPT:
+			wxMessageBox(wxString::Format("%s: %s",
+				_(localizationManager.GetTranslation("ERR_ENC_C_MBOX_ENCRYPT_ERROR")),
+				files[i].ToStdString()),
+				_(localizationManager.GetTranslation("C_MBOX_FILE")), wxOK | wxICON_INFORMATION);
+			break;
+		case Crypto::ERROR_OPEN_FILE:
+			wxMessageBox(wxString::Format("%s: %s",
+				_(localizationManager.GetTranslation("ERR_OPEN_C_MBOX_ENCRYPT_ERROR")),
+				files[i].ToStdString()),
+				_(localizationManager.GetTranslation("C_MBOX_FILE")), wxOK | wxICON_INFORMATION);
+			break;
+		default:
+			break;
+		}
 
 		if (delete_flag->GetValue())
 		{
@@ -722,20 +768,29 @@ void EncryptFrame::FileEncryptor()
 
 	erase_mem((void*)encrypt.key_params.key.data(), encrypt.key_params.key.size());
 	encrypt.crypto_flags.reset();
+
+	passText->Clear();
+	confPassText->Clear();
 }
 
 void EncryptFrame::OnDecryptFile(wxCommandEvent& event)
 {
+	wxBusyCursor busyCursor;
+	EnableAllControls(false);
+
 	std::thread decrypt([this]() {
 
 		FileDecryptor();
+
+		wxTheApp->CallAfter([this]() {
+			EnableAllControls(true);
+			});
 
 		}); decrypt.detach();
 }
 
 void EncryptFrame::FileDecryptor()
 {
-
 	size_t status = 0;
 	CryptoManager decrypt;
 	wxString output;
@@ -760,6 +815,19 @@ void EncryptFrame::FileDecryptor()
 	for (size_t i = 0; i < files.GetCount(); i++)
 	{
 		std::atomic<bool> stop_flag = false;
+		wxFileName filePath1(output.ToStdString());
+
+		output = GenerateNewFileName(files[i], i);
+
+		if (filePath1.FileExists())
+		{
+			int answer = wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_DECRYPT_FILE_EXIST")), _(localizationManager.GetTranslation("C_MBOX_FILE")), wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION, this);
+
+			if (answer == wxNO)
+			{
+				continue;
+			}
+		}
 
 		if (decrypt.getKeyParameters(files[i].ToStdString(), decrypt.key_params, &decrypt.header)) { // Header
 
@@ -783,10 +851,6 @@ void EncryptFrame::FileDecryptor()
 
 			selectedKdf = getAlgo(kdfAlgorithms)[decrypt.header.kdfAlgorithmID];
 			selectedCipher = getAlgo(cipherAlgorithms)[decrypt.header.encryptionAlgorithmID];
-
-			progress = (i + 1) * 100 / files.GetCount();
-			progress_crypt->SetValue(static_cast<int>(progress));
-			wxYield();
 
 			status = decrypt.deriveKeyFromPassword(
 				pass.ToStdString(), 
@@ -819,9 +883,7 @@ void EncryptFrame::FileDecryptor()
 				decrypt.key_params.key
 			);
 
-			output = generateNewFileName(files[i], i);
-
-			decrypt.decryptFile(
+			size_t status = decrypt.decryptFile(
 				files[i].ToStdString(), 
 				output.ToStdString(), 
 				decrypt.key_params, 
@@ -831,6 +893,27 @@ void EncryptFrame::FileDecryptor()
 				stop_flag,
 				&decrypt.header
 			);
+
+			switch (status) {
+			case Crypto::ERROR_DECRYPT:
+				wxMessageBox(wxString::Format("%s: %s",
+					_(localizationManager.GetTranslation("C_MBOX_DECRYPT_ERROR")),
+					files[i].ToStdString()),
+					_(localizationManager.GetTranslation("C_MBOX_FILE")), wxOK | wxICON_INFORMATION);
+				break;
+			case Crypto::ERROR_OPEN_FILE:
+				wxMessageBox(wxString::Format("%s: %s",
+					_(localizationManager.GetTranslation("C_MBOX_DECRYPT_ERROR")),
+					files[i].ToStdString()),
+					_(localizationManager.GetTranslation("C_MBOX_FILE")), wxOK | wxICON_INFORMATION);
+				break;
+			default:
+				break;
+			}
+
+			progress = (i + 1) * 100 / files.GetCount();
+			progress_crypt->SetValue(static_cast<int>(progress));
+			wxYield();
 		}
 		else { // No header
 
@@ -850,7 +933,7 @@ void EncryptFrame::FileDecryptor()
 
 				decrypt.kdf_params.kdf_strength = kdf_strength_id;
 
-				for (size_t kdf_algo_id = 0; kdf_algo_id < 2; kdf_algo_id++)
+				for (size_t kdf_algo_id = 0; kdf_algo_id < (kdf_choice->GetCount() - 1); kdf_algo_id++)
 				{
 					if (stop_flag) { continue; }
 
@@ -871,8 +954,6 @@ void EncryptFrame::FileDecryptor()
 						wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_DECRYPT_ERROR")), _(localizationManager.GetTranslation("C_MBOX_DECRYPT")), wxOK | wxICON_ERROR, this);
 						return;
 					}
-
-					output = generateNewFileName(files[i], i);
 
 					UpdateStatus(
 						textKdf,
@@ -901,13 +982,44 @@ void EncryptFrame::FileDecryptor()
 				}
 			}
 
-			if (status == Crypto::ERROR_DECRYPT) {
-				wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_DECRYPT_ERROR")), _(localizationManager.GetTranslation("C_MBOX_DECRYPT")), wxOK | wxICON_ERROR, this);
+			switch (status) {
+			case Crypto::ERROR_DECRYPT:
+				wxMessageBox(wxString::Format("%s: %s",
+					_(localizationManager.GetTranslation("C_MBOX_DECRYPT_ERROR")),
+					files[i].ToStdString()),
+					_(localizationManager.GetTranslation("C_MBOX_FILE")), wxOK | wxICON_INFORMATION);
+				break;
+			case Crypto::ERROR_OPEN_FILE:
+				wxMessageBox(wxString::Format("%s: %s",
+					_(localizationManager.GetTranslation("C_MBOX_DECRYPT_ERROR")),
+					files[i].ToStdString()),
+					_(localizationManager.GetTranslation("C_MBOX_FILE")), wxOK | wxICON_INFORMATION);
+				break;
+			default:
+				break;
 			}
 
 			progress = (i + 1) * 100 / files.GetCount();
 			progress_crypt->SetValue(static_cast<int>(progress));
 			wxYield();
+		}
+	}
+
+	erase_mem((void*)decrypt.key_params.key.data(), decrypt.key_params.key.size());
+
+	passText->Clear();
+	confPassText->Clear();
+}
+
+void EncryptFrame::EnableAllControls(bool enable)
+{
+	wxWindowList& children = this->GetChildren();
+	for (wxWindowList::iterator it = children.begin(); it != children.end(); ++it)
+	{
+		wxWindow* child = *it;
+		if (child && !dynamic_cast<wxGauge*>(child))
+		{
+			child->Enable(enable);
 		}
 	}
 }

@@ -216,18 +216,18 @@ size_t CryptoManager::encryptFile(
 		return Crypto::ERROR_OPEN_FILE;
 	}
 
-	std::ofstream out(outputFilename, std::ios::binary | std::ios::noreplace);
+	std::ofstream out(outputFilename, std::ios::binary);
 	if (!out) {
 		std::cerr << "Failed to open output file: " << outputFilename << std::endl;
 		return Crypto::ERROR_OPEN_FILE;
 	}
-
+	
 	Botan::secure_vector<uint8_t> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	if (buffer.empty()) {
 		std::cerr << "Input file is empty or could not be read." << std::endl;
 		return Crypto::ERROR_OPEN_FILE;
 	}
-
+	
 	try {
 		Botan::AutoSeeded_RNG rng;
 		Botan::SymmetricKey key(keyparams.key.data(), keyparams.key.size());
@@ -256,7 +256,6 @@ size_t CryptoManager::encryptFile(
 		cryptor->finish(output_data, 0);
 		out.write(reinterpret_cast<const char*>(output_data.data()), output_data.size());
 
-		erase_mem(const_cast<uint8_t*>(keyparams.key.data()), keyparams.key.size());
 		return Crypto::ERROR_OK;
 	}
 	catch (const Botan::Exception& e) {
@@ -268,8 +267,6 @@ size_t CryptoManager::encryptFile(
 	catch (...) {
 		std::cerr << "Unknown error occurred during encryption" << std::endl;
 	}
-
-	erase_mem(const_cast<uint8_t*>(keyparams.key.data()), keyparams.key.size());
 	return Crypto::ERROR_ENCRYPT;
 }
 

@@ -2,7 +2,7 @@
 #define CRYPTO_FETTER_H
 
 #include <wx/wx.h>
-
+#include <wx/xrc/xmlres.h>
 
 class Fetter:public wxApp
 {
