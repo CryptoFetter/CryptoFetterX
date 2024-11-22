@@ -190,7 +190,7 @@ void EncryptFrame::OnRadioTextSelected(wxCommandEvent& event)
 {
 	auto textHashes = getTextHashes();
 
-	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
+	wxRadioButton* radioButton = wxDynamicCast(event.GetEventObject(), wxRadioButton);
 	if (radioButton)
 	{
 		hashText->Clear();
@@ -213,7 +213,7 @@ void EncryptFrame::OnRadioFileSelected(wxCommandEvent& event)
 {
 	auto textHashes = getTextHashes();
 
-	wxRadioButton* radioButton = dynamic_cast<wxRadioButton*>(event.GetEventObject());
+	wxRadioButton* radioButton = wxDynamicCast(event.GetEventObject(), wxRadioButton);
 	if (radioButton)
 	{
 
@@ -703,9 +703,7 @@ void EncryptFrame::FileEncryptor()
 	{
 		output = GenerateNewFileName(files[i], i);
 
-		wxFileName filePath1(output.ToStdString());
-
-		if (filePath1.FileExists())
+		if (wxFileName::FileExists(output))
 		{
 			int answer = wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_ENCRYPT_FILE_EXIST")), _(localizationManager.GetTranslation("C_MBOX_FILE")), wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION, this);
 
@@ -714,10 +712,6 @@ void EncryptFrame::FileEncryptor()
 				return;
 			}
 		}
-
-		progress = (i + 1) * 100 / files.GetCount();
-		progress_crypt->SetValue(static_cast<int>(progress));
-		wxYield();
 
 		UpdateStatus(
 			textKdf,
@@ -759,6 +753,10 @@ void EncryptFrame::FileEncryptor()
 		default:
 			break;
 		}
+
+		progress = (i + 1) * 100 / files.GetCount();
+		progress_crypt->SetValue(static_cast<int>(progress));
+		wxYield();
 
 		if (delete_flag->GetValue())
 		{
@@ -815,11 +813,10 @@ void EncryptFrame::FileDecryptor()
 	for (size_t i = 0; i < files.GetCount(); i++)
 	{
 		std::atomic<bool> stop_flag = false;
-		wxFileName filePath1(output.ToStdString());
 
 		output = GenerateNewFileName(files[i], i);
 
-		if (filePath1.FileExists())
+		if (wxFileName::FileExists(output))
 		{
 			int answer = wxMessageBox(_(localizationManager.GetTranslation("C_MBOX_DECRYPT_FILE_EXIST")), _(localizationManager.GetTranslation("C_MBOX_FILE")), wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION, this);
 
@@ -910,10 +907,6 @@ void EncryptFrame::FileDecryptor()
 			default:
 				break;
 			}
-
-			progress = (i + 1) * 100 / files.GetCount();
-			progress_crypt->SetValue(static_cast<int>(progress));
-			wxYield();
 		}
 		else { // No header
 
@@ -998,11 +991,11 @@ void EncryptFrame::FileDecryptor()
 			default:
 				break;
 			}
-
-			progress = (i + 1) * 100 / files.GetCount();
-			progress_crypt->SetValue(static_cast<int>(progress));
-			wxYield();
 		}
+
+		progress = (i + 1) * 100 / files.GetCount();
+		progress_crypt->SetValue(static_cast<int>(progress));
+		wxYield();
 	}
 
 	erase_mem((void*)decrypt.key_params.key.data(), decrypt.key_params.key.size());
@@ -1017,7 +1010,7 @@ void EncryptFrame::EnableAllControls(bool enable)
 	for (wxWindowList::iterator it = children.begin(); it != children.end(); ++it)
 	{
 		wxWindow* child = *it;
-		if (child && !dynamic_cast<wxGauge*>(child))
+		if (child && !wxDynamicCast(child, wxGauge))
 		{
 			child->Enable(enable);
 		}

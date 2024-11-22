@@ -111,13 +111,13 @@ class EncryptFrame : public wxFrame
     {"MD5", 128}
     };
 
-    std::map<int, std::string> kdfAlgorithms = {
+    std::map<size_t, std::string> kdfAlgorithms = {
         {0, "Auto"},
         {1, "Argon2id"},
         {2, "Scrypt"}
     };
 
-    std::map<int, std::string> cipherAlgorithms = {
+    std::map<size_t, std::string> cipherAlgorithms = {
         {0, "Auto"},
         {1, "AES-256/GCM"},
         {2, "Serpent/GCM"},
@@ -176,7 +176,7 @@ public:
     void OnRadioFileSelected(wxCommandEvent& event);
     void OnRadioTextSelected(wxCommandEvent& event);
 
-    std::vector<std::string> getAlgo(const std::map<int, std::string>& cipherAlgorithms) {
+    std::vector<std::string> getAlgo(const std::map<size_t, std::string>& cipherAlgorithms) {
         std::vector<std::string> algorithms;
 
         auto it = cipherAlgorithms.begin();
