@@ -1,5 +1,5 @@
 # CryptoFetterX
-This is a program for strong file encryption (under development).
+This is a program for strong file encryption.
 
 ## Key features
 
@@ -18,20 +18,18 @@ This is a program for strong file encryption (under development).
 <ul>
     <li>Botan 3.4</li>
     <li>bzip2 1.0.8</li>
-    <li>wxWidgets 3.2.5</li>
+    <li>wxWidgets 3.2.4</li>
 </ul>
 <strong>Planned</strong>:
 <ul>
-    <li>Bugfix: Perform large-scale code refactoring from alpha version to release</li>
     <li>Release CryptoFetterX for Linux and macOS</li>
-    <li>Add detachable headers to files to speed up the decryption process on weak computers</li>
 </ul>
 
 # Donations
 
 <strong>Please donate to CryptoFetterX. This is a project that I spend a lot of time on and do not make any money from. CryptoFetterX needs support from the community</strong>
 
-<strong>Monero Wallet (XMR)</strong>: 8AcFyDHXmqQ7Swb2imehDb6eWK3ruSeeSABYYZBkugc3h5cckyhBnbZPZmZPRhcPBvZN7K4LFo9QfTtSqx2kyUwnG79eF9B
+<strong>Monero Wallet (XMR)</strong>: 8AcFyDHXmqQ7Swb2imehDb6eWK3ruSeeSABYYZBkugc3h5cckyhBnbZPZmZPRhcPBvZN7K4LFo9QfTtSqx2kyUwnG79eF9B<br>
 <strong>Dash Wallet</strong>: XoVm3LDinKk2SibGoHVPV1dFQa79LGEiEx
 
 ## Thank you for your support and understanding
