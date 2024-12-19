@@ -45,14 +45,41 @@ std::unique_ptr<Botan::AEAD_Mode> CryptoManager::createCipher(
 	}
 }
 
+std::unique_ptr<Botan::Compression_Algorithm> CryptoManager::createCompressor(
+	const std::string& compression_algorithm,
+	bool compress
+) {
+	try {
+
+		auto compressor = Botan::Compression_Algorithm::create_or_throw(compression_algorithm);
+
+		if (compress) {
+			compressor->start(COMPRESS_LEVEL);
+		}
+		else {
+			compressor->start();
+		}
+
+		return compressor;
+	}
+	catch (const Botan::Exception& e) {
+		throw std::runtime_error("Botan error during compressor creation: " + std::string(e.what()));
+	}
+	catch (const std::exception& e) {
+		throw std::runtime_error("Standard error during compressor creation: " + std::string(e.what()));
+	}
+	catch (...) {
+		throw std::runtime_error("Unknown error occurred during compressor creation");
+	}
+}
+
 std::unique_ptr<Botan::secure_vector<uint8_t>> CryptoManager::compressData(
 	const Botan::secure_vector<uint8_t>& input,
 	const std::string& compression_algorithm
 ) {
-	auto compressor = Botan::Compression_Algorithm::create(compression_algorithm);
-	if (!compressor) {
-		throw std::runtime_error("Invalid compression algorithm: " + compression_algorithm);
-	}
+	try {
+
+	auto compressor = Botan::Compression_Algorithm::create_or_throw(compression_algorithm);
 
 	compressor->start(COMPRESS_LEVEL);
 
@@ -61,6 +88,17 @@ std::unique_ptr<Botan::secure_vector<uint8_t>> CryptoManager::compressData(
 	compressor->finish(*output, 0);
 
 	return output;
+
+	}
+	catch (const Botan::Exception& e) {
+		throw std::runtime_error("Botan error during compressor creation: " + std::string(e.what()));
+	}
+	catch (const std::exception& e) {
+		throw std::runtime_error("Standard error during compressor creation: " + std::string(e.what()));
+	}
+	catch (...) {
+		throw std::runtime_error("Unknown error occurred during compressor creation");
+	}
 }
 
 std::unique_ptr<Botan::secure_vector<uint8_t>> CryptoManager::decompressData(
@@ -82,7 +120,7 @@ std::unique_ptr<Botan::secure_vector<uint8_t>> CryptoManager::decompressData(
 }
 
 Botan::secure_vector<uint8_t> CryptoManager::getHashFile(
-	const std::string& file_path,
+	const std::wstring& file_path,
 	const std::string& algo
 )
 {
@@ -130,11 +168,13 @@ size_t CryptoManager::deriveKeyFromPassword(
 	KeyParameters& keydata,
 	const std::bitset<7>& flag,
 	const std::string& kdf,
-	const std::string& keyfile
+	const std::wstring& keyfile
 )
 {
 	try {
 		Botan::AutoSeeded_RNG rng;
+
+		rng.clear();
 
 		keydata.key = Botan::secure_vector<uint8_t>(KEY_SIZE);
 
@@ -149,7 +189,9 @@ size_t CryptoManager::deriveKeyFromPassword(
 				rng.randomize_with_input(&keydata.salt[0], SALT_SIZE, keydata.seed.data(), keydata.seed.size());
 			}
 			else {
-				rng.randomize_with_ts_input(&keydata.salt[0], SALT_SIZE);
+				do {
+					rng.randomize_with_ts_input(&keydata.salt[0], SALT_SIZE);
+				} while (!CheckRandomnessQuality(keydata.salt));
 			}
 		}
 
@@ -203,8 +245,8 @@ size_t CryptoManager::deriveKeyFromPassword(
 }
 
 size_t CryptoManager::encryptFile(
-	const std::string& inputFilename,
-	const std::string& outputFilename,
+	const std::wstring& inputFilename,
+	const std::wstring& outputFilename,
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
 	const std::bitset<7>& flag,
@@ -221,7 +263,7 @@ size_t CryptoManager::encryptFile(
 		std::cerr << "Failed to open output file: " << outputFilename << std::endl;
 		return Crypto::ERROR_OPEN_FILE;
 	}
-	
+
 	Botan::secure_vector<uint8_t> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	if (buffer.empty()) {
 		std::cerr << "Input file is empty or could not be read." << std::endl;
@@ -229,11 +271,14 @@ size_t CryptoManager::encryptFile(
 	}
 	
 	try {
+
 		Botan::AutoSeeded_RNG rng;
 		Botan::SymmetricKey key(keyparams.key.data(), keyparams.key.size());
 		Botan::InitializationVector iv(rng, IV_SIZE);
 		Botan::secure_vector<uint8_t> iv_bits = iv.bits_of();
+
 		std::unique_ptr<Botan::AEAD_Mode> cryptor = createCipher(selectedCipher, "Encrypt", key, iv, (flag.test(Crypto::HEADER) && header) ? header : nullptr);
+		std::unique_ptr<Botan::Compression_Algorithm> compressor = createCompressor("zlib", flag.test(Crypto::COMPRESS));
 
 		if (flag.test(Crypto::HEADER) && header) {
 			out.write(reinterpret_cast<const char*>(header), sizeof(OptionalFetterHeader));
@@ -249,12 +294,13 @@ size_t CryptoManager::encryptFile(
 			out.write(reinterpret_cast<const char*>(keyparams.salt.data()), keyparams.salt.size());
 		}
 
-		Botan::secure_vector<uint8_t> output_data = flag.test(Crypto::COMPRESS)
-			? *compressData(buffer, "bzip2")
-			: std::move(buffer);
+		if (flag.test(Crypto::COMPRESS)) {
+			compressor->finish(buffer, 0);
+		}
 
-		cryptor->finish(output_data, 0);
-		out.write(reinterpret_cast<const char*>(output_data.data()), output_data.size());
+		cryptor->finish(buffer, 0);
+
+		out.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 
 		return Crypto::ERROR_OK;
 	}
@@ -271,8 +317,8 @@ size_t CryptoManager::encryptFile(
 }
 
 size_t CryptoManager::decryptFile(
-	const std::string& inputFilename,
-	const std::string& outputFilename,
+	const std::wstring& inputFilename,
+	const std::wstring& outputFilename,
 	const KeyParameters& keyparams,
 	const std::string& selectedCipher,
 	const std::bitset<7>& flag,
@@ -307,7 +353,7 @@ size_t CryptoManager::decryptFile(
 
 			if (flag.test(Crypto::COMPRESS)) {
 				cipher_mode->finish(buffer);
-				output_data = *decompressData(buffer, "bzip2");
+				output_data = *decompressData(buffer, "zlib");
 				out.write(reinterpret_cast<const char*>(output_data.data()), output_data.size());
 			}
 			else {
@@ -343,8 +389,7 @@ size_t CryptoManager::decryptFile(
 					cipher_mode->finish(temp_buffer);
 
 					try {
-						output_data = *decompressData(temp_buffer, "bzip2");
-
+						output_data = *decompressData(temp_buffer, "zlib");
 						{
 							std::lock_guard<std::mutex> lock(file_mutex);
 							out.seekp(0);
@@ -381,7 +426,7 @@ size_t CryptoManager::decryptFile(
 }
 
 bool CryptoManager::getKeyParameters(
-	const std::string& inputFilename,
+	const std::wstring& inputFilename,
 	KeyParameters& keyparams,
 	OptionalFetterHeader* header
 )
@@ -451,42 +496,110 @@ CryptoManager::OptionalFetterHeader CryptoManager::createEncryptFileHeader(
 	return header;
 }
 
-double CryptoManager::calculateEntropy(const std::wstring& password) {
-	const int specialCharSize = 32;
-	int charsetSize = 0;
-	bool hasLowerCase = false, hasUpperCase = false, hasDigit = false, hasSpecialChar = false;
-	bool hasConsecutiveCharacters = false;
+bool CryptoManager::CheckRandomnessQuality(const Botan::secure_vector<uint8_t>& data) {
+	if (data.empty()) {
+		return false;
+	}
 
-	std::unordered_set<wchar_t> uniqueChars;
+	size_t x = 120, y = 135;
 
-	std::locale loc("");
-	for (size_t i = 0; i < password.size(); ++i) {
-		wchar_t ch = password[i];
-		uniqueChars.insert(ch);
+	size_t size = data.size();
+	if (size == 64) {
+		x = 125;
+		y = 130;
+	}
 
-		if (std::islower(ch, loc)) hasLowerCase = true;
-		else if (std::isupper(ch, loc)) hasUpperCase = true;
-		else if (std::isdigit(ch, loc)) hasDigit = true;
-		else hasSpecialChar = true;
+	// 1. Byte distribution check
+	std::array<size_t, 256> byteFrequency = { 0 };
+	for (auto byte : data) {
+		byteFrequency[byte]++;
+	}
 
-		if (i > 0 && password[i] == password[i - 1]) {
-			hasConsecutiveCharacters = true;
+	double expectedFrequency = static_cast<double>(size) / 256.0;
+	double chiSquare = 0.0;
+	for (size_t freq : byteFrequency) {
+		double diff = freq - expectedFrequency;
+		chiSquare += (diff * diff) / expectedFrequency;
+	}
+	double thresholdChiSquare = 350.0;
+	if (chiSquare > thresholdChiSquare) {
+		return false;
+	}
+
+	// 2. Mean value check
+	double mean = std::accumulate(data.begin(), data.end(), 0.0) / size;
+	if (mean < x || mean > y) {
+		return false;
+	}
+
+	// 3. Standard deviation check
+	double variance = 0.0;
+	for (auto byte : data) {
+		variance += std::pow(static_cast<double>(byte) - mean, 2);
+	}
+	variance /= size;
+	double stddev = std::sqrt(variance);
+	if (stddev < 70 || stddev > 80) {
+		return false;
+	}
+
+	// 4. Maximum length of consecutive identical bytes check
+	size_t consecutiveCount = 0;
+	size_t maxConsecutiveCount = 0;
+	for (size_t i = 1; i < size; ++i) {
+		if (data[i] == data[i - 1]) {
+			++consecutiveCount;
+		}
+		else {
+			maxConsecutiveCount = std::max(maxConsecutiveCount, consecutiveCount);
+			consecutiveCount = 0;
 		}
 	}
-
-	charsetSize = (hasLowerCase ? 26 : 0)
-		+ (hasUpperCase ? 26 : 0)
-		+ (hasDigit ? 10 : 0)
-		+ (hasSpecialChar ? specialCharSize : 0);
-
-	int uniqueCharsetSize = uniqueChars.size();
-	int effectiveCharsetSize = (uniqueCharsetSize > 0) ? uniqueCharsetSize : 1;
-
-	double entropy = password.length() * std::log2(effectiveCharsetSize);
-
-	if (hasConsecutiveCharacters) {
-		entropy *= 0.7;
+	maxConsecutiveCount = std::max(maxConsecutiveCount, consecutiveCount);
+	if (maxConsecutiveCount > 5) {
+		return false;
 	}
 
-	return entropy;
+	// 5. Autocorrelation check (lag = 1)
+	size_t matches = 0;
+	for (size_t i = 0; i < size - 1; ++i) {
+		if (data[i] == data[i + 1]) {
+			++matches;
+		}
+	}
+	double autocorrelation = static_cast<double>(matches) / (size - 1);
+	if (autocorrelation > 0.02) {
+		return false;
+	}
+
+	return true;
+}
+
+size_t CryptoManager::getRandomNumber(size_t min, size_t max) {
+	if (min > max) {
+		throw std::invalid_argument("Min value cannot be greater than max value");
+	}
+
+	try {
+
+	Botan::AutoSeeded_RNG rng;
+
+	size_t range = max - min + 1;
+	size_t random_number = min + (rng.next_byte() % range);
+
+	return random_number;
+
+	}
+	catch (const Botan::Exception& e) {
+		std::cerr << "Botan exception: " << e.what() << std::endl;
+		throw;
+	}
+	catch (const std::runtime_error& e) {
+		std::cerr << "Runtime error: " << e.what() << std::endl;
+		throw;
+	}
+	catch (...) {
+		std::cerr << "Unknown error." << std::endl;
+		throw;
+	}
 }

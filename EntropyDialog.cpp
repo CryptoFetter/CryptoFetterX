@@ -26,26 +26,28 @@ EntropyDialog::EntropyDialog(wxWindow* parent, wxWindowID id, const wxString& ti
 
 void EntropyDialog::OnMouseEvent(wxMouseEvent& evt) {
 
-    static wxStopWatch stopwatch;
+    CryptoManager encrypt;
 
-    if (stopwatch.Time() > 5) {
+    wxPoint mousePos = evt.GetPosition();
 
-        wxPoint mousePos = evt.GetPosition();
+    unsigned char x_byte = static_cast<unsigned char>(mousePos.x);
+    unsigned char y_byte = static_cast<unsigned char>(mousePos.y);
 
-        unsigned char x_byte = static_cast<unsigned char>(mousePos.x);
-        unsigned char y_byte = static_cast<unsigned char>(mousePos.y);
+    wxMilliSleep(3);
 
-        wxMilliSleep(3);
+    mouse_byte_sequence.push_back(x_byte);
+    mouse_byte_sequence.push_back(y_byte);
 
-        mouse_byte_sequence.push_back(x_byte);
-        mouse_byte_sequence.push_back(y_byte);
+    progress_entropy->SetValue(static_cast<int>(mouse_byte_sequence.size()));
 
-        progress_entropy->SetValue(static_cast<int>(mouse_byte_sequence.size()));
+    if (mouse_byte_sequence.size() >= 2048) {
 
-        if (mouse_byte_sequence.size() >= 2048) {
+        if (encrypt.CheckRandomnessQuality(mouse_byte_sequence)) {
             Close(true);
         }
-
-        stopwatch.Start();
+        else {
+            mouse_byte_sequence.clear();
+            progress_entropy->SetValue(static_cast<int>(mouse_byte_sequence.size()));
+        }
     }
 }

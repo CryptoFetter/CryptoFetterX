@@ -16,8 +16,6 @@
 #include <botan/compression.h>
 #include <botan/aead.h>
 
-#include <include/bzlib.h>
-
 #include <bitset>
 #include <fstream>
 #include <vector>
@@ -30,6 +28,11 @@
 #include <unordered_set>
 #include <future>
 #include <atomic>
+#include <numeric>
+#include <cmath>
+#include <iomanip>
+#include <vector>
+#include <algorithm>
 
 #include <thread>
 #include <mutex>
@@ -99,18 +102,20 @@ public:
         uint8_t reserved[96];
     }header;
 
+    size_t getRandomNumber(size_t min, size_t max);
+
     size_t deriveKeyFromPassword(
         const std::string& password,
         KdfParameters& param,
         KeyParameters& keydata,
         const std::bitset<7>& flag,
         const std::string& kdf,
-        const std::string& keyfile
+        const std::wstring& keyfile
     );
 
     size_t encryptFile(
-        const std::string& inputFilename,
-        const std::string& outputFilename,
+        const std::wstring& inputFilename,
+        const std::wstring& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
         const std::bitset<7>& flag,
@@ -118,8 +123,8 @@ public:
     );
 
     size_t decryptFile(
-        const std::string& inputFilename,
-        const std::string& outputFilename,
+        const std::wstring& inputFilename,
+        const std::wstring& outputFilename,
         const KeyParameters& keyparams,
         const std::string& selectedCipher,
         const std::bitset<7>& flag,
@@ -129,7 +134,7 @@ public:
     );
 
     bool getKeyParameters(
-        const std::string& inputFilename,
+        const std::wstring& inputFilename,
         KeyParameters& keyparams,
         OptionalFetterHeader* header = nullptr
     );
@@ -140,6 +145,11 @@ public:
         const Botan::SymmetricKey& key, 
         const Botan::InitializationVector& iv,
         const OptionalFetterHeader* header = nullptr
+    );
+
+    std::unique_ptr<Botan::Compression_Algorithm> createCompressor(
+        const std::string& compression_algorithm,
+        bool compress
     );
 
     std::unique_ptr<Botan::secure_vector<uint8_t>> compressData(
@@ -162,7 +172,7 @@ public:
     );
 
     Botan::secure_vector<uint8_t> getHashFile(
-        const std::string &file_path,
+        const std::wstring &file_path,
         const std::string &algo
     );
 
@@ -171,7 +181,7 @@ public:
         const std::string &algo
     );
 
-    double calculateEntropy(const std::wstring& password);
+    bool CheckRandomnessQuality(const Botan::secure_vector<uint8_t>& data);
 
     static const int IV_SIZE = 16;
     static const int KEY_SIZE = 32;

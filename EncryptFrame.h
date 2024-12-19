@@ -11,6 +11,8 @@
 #include <wx/xml/xml.h>
 #include <wx/xrc/xmlres.h>
 #include <wx/file.h>
+#include <wx/spinctrl.h>
+#include <wx/clipbrd.h>
 
 #include <botan/system_rng.h>
 
@@ -30,6 +32,26 @@ class EncryptFrame : public wxFrame
 
     wxString selectedSaveDir;
 
+    wxSpinCtrl* spinCtrl;
+
+    wxTextCtrl* pass_1;
+    wxTextCtrl* pass_2;
+    wxTextCtrl* pass_3;
+    wxTextCtrl* pass_4;
+
+    wxCheckBox* alphabet1;
+    wxCheckBox* alphabet2;
+    wxCheckBox* alphabet3;
+    wxCheckBox* alphabet4;
+    wxCheckBox* alphabet5;
+    wxCheckBox* alphabet6;
+    wxCheckBox* alphabet7;
+    wxCheckBox* alphabet8;
+    wxCheckBox* alphabet9;
+    wxCheckBox* alphabet10;
+
+    double entropy;
+
     wxCheckBox* deniability_flag;
     wxCheckBox* compress_flag;
     wxCheckBox* delete_flag;
@@ -39,6 +61,11 @@ class EncryptFrame : public wxFrame
 
     wxButton* encryptButton;
     wxButton* decryptButton;
+
+    wxGauge* pass_test1;
+    wxGauge* pass_test2;
+    wxGauge* pass_test3;
+    wxGauge* pass_test4;
 
     wxButton* key_file;
 
@@ -96,6 +123,8 @@ class EncryptFrame : public wxFrame
     wxStaticText* textSalt;
     wxStaticText* textKey;
 
+    wxString password;
+
     bool boolHashText;
 
     wxButton* open_hash_file;
@@ -127,9 +156,18 @@ class EncryptFrame : public wxFrame
 
     LocalizationManager localizationManager;
 
+    enum {
+        ID_COPY_PASS1 = 1000,
+        ID_COPY_PASS2,
+        ID_COPY_PASS3,
+        ID_COPY_PASS4
+    };
+
 public:
 
     EncryptFrame(const wxString& title);
+
+    void OnCopyPassword(wxCommandEvent& event);
 
     void EnableAllControls(bool enable);
 
@@ -146,6 +184,10 @@ public:
     void FileDecryptor();
     void FileEncryptor();
 
+    void OnCheckboxMemorable(wxCommandEvent& event);
+
+    void FileHasher();
+
     void OnHidePassBox(wxCommandEvent& event);
 
     void OnKeyfileBoxChanged(wxCommandEvent& event);
@@ -155,6 +197,8 @@ public:
     void OnSaveOutputFolder(wxCommandEvent& event);
 
     void OnOpenHashFile(wxCommandEvent& event);
+
+    void OnGenPassword(wxCommandEvent& event);
 
     void UpdateStatus(
         wxStaticText* textKdf,

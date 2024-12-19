@@ -17,6 +17,8 @@ public:
     wxString GetTranslation(const wxString& id) const;
 
 private:
+    const size_t MAX_STRING_LENGTH = 1024;
+
     // id -> translate
     std::map<wxString, wxString> translations;
 };

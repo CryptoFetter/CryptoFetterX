@@ -7,8 +7,22 @@
     <entry id="BUTTON_OPEN_FILE">Open file</entry>
     <entry id="BUTTON_HASH_TEXT">Hash Text</entry>
 
+    <entry id="ALPA_UPPER">Uppercase (A-Z)</entry>
+    <entry id="ALPA_LOWER">Lowercase (a-z)</entry>
+    <entry id="ALPA_DIGITS">Digits (0-9)</entry>
+    <entry id="ALPA_SIMILAR">Exclude similar chars (0, o, O, I, l, 1)</entry>
+    <entry id="ALPA_SPEC">Special (!, @, #, $, % ...)</entry>
+    <entry id="ALPA_SPACE">Space</entry>
+    <entry id="ALPA_MINUS">Minus (-)</entry>
+    <entry id="ALPA_BRACK">Brackets (&lt;, &gt;, [, ] ...)</entry>
+    <entry id="ALPA_UNDERLINE">Underline (_)</entry>
+    <entry id="ALPA_MEMORABLE">Memorable</entry>
+    <entry id="PASS_LEN">Password length</entry>
+    <entry id="BUTTON_PASSGEN">Generate</entry>
+
     <entry id="PAGE_ENCRYPTION">File encryption</entry>
     <entry id="PAGE_HASHER">Hasher</entry>
+    <entry id="PAGE_PASSGEN">Password Generator</entry>
 
     <entry id="S_BOX_ENTER_PASS">Enter password</entry>
     <entry id="S_BOX_ENCRYPT_SETTINGS">Encrypt settings</entry>
@@ -78,4 +92,17 @@
     <entry id="TOOLTIP_PASS_LEN">Max 256 characters</entry>
     <entry id="TOOLTIP_TEXT_LEN">Max 4096 characters</entry>
     <entry id="TOOLTIP_CHOICE">Auto - algorithm is selected randomly</entry>
+
+    <entry id="STATUS_KDF_LOW">Low</entry>
+    <entry id="STATUS_KDF_MEDIUM">Medium</entry>
+    <entry id="STATUS_KDF_HIGHT">Hight</entry>
+    <entry id="STATUS_KDF_UNKNOWN">Unknown</entry>
+    <entry id="STATUS_KDF_ALGO">KDF Algo:</entry>
+    <entry id="STATUS_KDF_STRENGTH">KDF Strength: </entry>
+    <entry id="STATUS_CIPHER">Cipher: </entry>
+    <entry id="STATUS_HEADER">Header: </entry>
+    <entry id="STATUS_COMPRESS">Compress: </entry>
+    <entry id="STATUS_KEYFILE">Keyfile: </entry>
+    <entry id="STATUS_YES">Yes</entry>
+    <entry id="STATUS_NO">No</entry>
 </locale>

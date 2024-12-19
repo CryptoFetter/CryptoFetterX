@@ -1,4 +1,4 @@
-void erase_mem(void* mem, size_t size) {
+void eraseMemory(void* mem, size_t size) {
     if (mem != nullptr && size > 0) {
         volatile char* burnm = (volatile char*)mem;
         while (size--) {

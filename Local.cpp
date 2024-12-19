@@ -34,7 +34,14 @@ wxString LocalizationManager::GetTranslation(const wxString& id) const
     auto it = translations.find(id);
     if (it != translations.end())
     {
-        return it->second;
+        wxString result = it->second;
+
+        if (result.length() > MAX_STRING_LENGTH)
+        {
+            result = result.substr(0, MAX_STRING_LENGTH);
+        }
+
+        return result;
     }
     return id;
 }
